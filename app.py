@@ -384,14 +384,16 @@ def update_engine():
 def index(): return app.send_static_file('index.html')
 
 if __name__ == '__main__':
+    # Configuração de Host: 127.0.0.1 para local (seguro), 0.0.0.0 para Docker/Nuvem
+    is_frozen = getattr(sys, 'frozen', False)
+    host_addr = '127.0.0.1' if is_frozen else '0.0.0.0'
+    
     # Abrir o browser automaticamente apenas se estiver no modo executável
-    if getattr(sys, 'frozen', False):
+    if is_frozen:
         import webbrowser
         from threading import Timer
         def open_browser():
-            # Direciona para o instalador na primeira execução do executável
             webbrowser.open("http://127.0.0.1:5000/installer")
-        # Aumentamos o tempo para 2.5s para garantir que o Flask já subiu
         Timer(2.5, open_browser).start()
         
-    app.run(debug=False, host='127.0.0.1', port=5000)
+    app.run(debug=not is_frozen, host=host_addr, port=5000)
