@@ -159,17 +159,39 @@ def save_cookies():
 @app.route('/api/info', methods=['POST'])
 def get_info():
     try:
-        url = request.json.get('url')
-        # Adicionamos ignoreerrors para não travar se um vídeo da playlist estiver privado/deletado
-        # E garantimos que ele pegue todos os itens (playlist_items: 'all' é o padrão, mas reforçamos)
-        ydl_opts = {**get_common_opts(), 'extract_flat': True, 'ignoreerrors': True}
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({'error': 'JSON inválido ou ausente.'}), 400
+        
+        url = data.get('url')
+        if not url:
+            return jsonify({'error': 'URL é obrigatória.'}), 400
+            
+        print(f"[Analise] Processando URL: {url}")
+        
+        # Opções MINIMALISTAS para análise (evita erro de formato não disponível)
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'format': 'best', # Força o melhor disponível sem filtros complexos
+            'extract_flat': 'in_playlist',
+            'ignoreerrors': True,
+            'noplaylist': True,
+            'extract_chapters': False,
+            'check_formats': False,
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
+            try:
+                info = ydl.extract_info(url, download=False)
+            except Exception as e:
+                err_msg = str(e).split('\n')[0] # Pega apenas a primeira linha do erro
+                print(f"[Erro yt-dlp] {err_msg}")
+                return jsonify({'error': f'YouTube disse: {err_msg}'}), 400
             
-            # Se for uma playlist e falhou no extract_flat, tentamos novamente
             if not info:
-                return jsonify({'error': 'Não foi possível obter informações do link.'}), 400
+                return jsonify({'error': 'Não foi possível obter dados. Tente sincronizar cookies ou usar outro link.'}), 400
                 
             # Se for playlist, garantir que processamos todas as entradas válidas
             entries = []
@@ -285,16 +307,13 @@ def download_section():
                 **get_common_opts(), 
                 'format': 'bestvideo+bestaudio/best' if format_type == 'mp4' else 'bestaudio/best', 
                 'outtmpl': out_tmpl, 
-                'download_sections': [section_str],
+                'download_sections': [f"*{start_str}-{end_str}"],
                 'force_keyframes_at_cuts': True,
                 'nopart': True,
-                # --- SEEK RÁPIDO PARA VÍDEOS LONGOS ---
-                # Usar external_downloader_args para colocar o -ss ANTES do input
-                'external_downloader': 'ffmpeg',
-                'external_downloader_args': {
-                    'ffmpeg_i': ['-ss', start_str, '-to', end_str]
-                },
-                'hls_use_mpegts': True, 
+                # Aumentamos os fragmentos simultâneos para ser muito mais rápido
+                'concurrent_fragment_downloads': 10,
+                # Evita baixar o vídeo todo se houver erro de seek
+                'ignoreerrors': True,
             }
             
             # Sobrescreve o progress_hook para usar o section_id
@@ -340,6 +359,15 @@ def get_history():
                     })
     return jsonify({'files': sorted(files, key=lambda x: x['date'], reverse=True), 'current_path': DOWNLOAD_FOLDER})
 
+@app.route('/api/update-engine', methods=['POST'])
+def update_engine():
+    """Atualiza o yt-dlp para a versão mais recente."""
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"])
+        return jsonify({'success': True, 'message': 'Motor atualizado com sucesso!'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @app.route('/api/select-folder', methods=['POST'])
 def select_folder():
     global DOWNLOAD_FOLDER
@@ -370,15 +398,6 @@ def stream_file(filename):
         if filename in filenames:
             return send_file(os.path.join(root, filename))
     return "Ficheiro não encontrado", 404
-
-@app.route('/api/update-engine', methods=['POST'])
-def update_engine():
-    """Atualiza o yt-dlp para a versão mais recente."""
-    try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"])
-        return jsonify({'success': True, 'message': 'Motor atualizado com sucesso!'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/')
 def index(): return app.send_static_file('index.html')

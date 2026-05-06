@@ -307,6 +307,7 @@ async function fetchInfo() {
     if (!url) return;
     loader.classList.remove('hidden');
     previewSection.classList.add('hidden');
+    console.log('Enviando para análise:', url);
     try {
         const response = await fetch('/api/info', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
         const data = await response.json();
