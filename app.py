@@ -571,25 +571,28 @@ def clear_history():
 
 @app.route('/api/stream/<path:filename>')
 def stream_file(filename):
-    """Serve ficheiros para o player do navegador com suporte a busca flexível."""
+    """Serve ficheiros para o player do navegador com suporte a MIME types e busca flexível."""
     import urllib.parse
+    import mimetypes
     
-    # Descodificar o nome do ficheiro (caso venha com %20, etc)
     decoded_name = urllib.parse.unquote(filename)
     base_name = os.path.splitext(decoded_name)[0]
     
-    print(f"[Stream] Procurando por: {decoded_name}")
-    
-    # Procura o ficheiro na pasta de downloads (incluindo subpastas)
     for root, dirs, filenames in os.walk(DOWNLOAD_FOLDER):
+        target_file = None
         # 1. Procura exata
         if decoded_name in filenames:
-            return send_file(os.path.join(root, decoded_name))
+            target_file = os.path.join(root, decoded_name)
+        # 2. Procura pelo nome base
+        else:
+            for f in filenames:
+                if os.path.splitext(f)[0] == base_name:
+                    target_file = os.path.join(root, f)
+                    break
         
-        # 2. Procura pelo nome base (caso a extensão tenha mudado de .mkv para .mp4 no pedido)
-        for f in filenames:
-            if os.path.splitext(f)[0] == base_name:
-                return send_file(os.path.join(root, f))
+        if target_file:
+            mime_type, _ = mimetypes.guess_type(target_file)
+            return send_file(target_file, mimetype=mime_type or 'video/mp4')
                 
     return "Ficheiro não encontrado", 404
 
