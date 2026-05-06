@@ -168,7 +168,8 @@ def get_info():
             return jsonify({
                 'id': info.get('id'), 'title': info.get('title'), 'thumbnail': main_thumbnail,
                 'channel': info.get('uploader') or info.get('channel'), 'description': info.get('description', ''),
-                'url': url, 'is_playlist': 'entries' in info, 'entries': entries, 'current_path': DOWNLOAD_FOLDER
+                'url': url, 'is_playlist': 'entries' in info, 'entries': entries, 'current_path': DOWNLOAD_FOLDER,
+                'chapters': info.get('chapters', [])
             })
     except Exception as e: return jsonify({'error': str(e)}), 400
 
@@ -207,6 +208,51 @@ def download_single():
         except: progress_store[video_id] = {'percent': 0, 'status': 'error'}
     threading.Thread(target=run_download).start()
     return jsonify({'success': True})
+@app.route('/api/download-section', methods=['POST'])
+def download_section():
+    data = request.json
+    url, video_id, format_type = data.get('url'), data.get('id'), data.get('format', 'mp4')
+    start, end, title = data.get('start'), data.get('end'), data.get('title', 'clip')
+    
+    # ID único para a task de seção
+    section_id = f"{video_id}_{start}_{end}"
+    
+    def run_download():
+        try:
+            progress_store[section_id] = {'percent': 0, 'status': 'starting'}
+            out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"%(title)s - {title}.%(ext)s")
+            
+            # Formata a seção para o yt-dlp
+            section_str = f"*{start}-{end}"
+            
+            ydl_opts = {
+                **get_common_opts(), 
+                'format': 'bestvideo+bestaudio/best' if format_type == 'mp4' else 'bestaudio/best', 
+                'outtmpl': out_tmpl, 
+                'download_sections': [section_str],
+                'force_keyframes_at_cuts': True, # Garante corte limpo
+                'nopart': True
+            }
+            
+            # Sobrescreve o progress_hook para usar o section_id
+            def section_hook(d):
+                if d['status'] == 'downloading':
+                    downloaded = d.get('downloaded_bytes', 0)
+                    total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
+                    percent = (downloaded / total * 100) if total > 0 else 0
+                    progress_store[section_id] = {'percent': round(percent, 1), 'status': 'downloading'}
+                elif d['status'] == 'finished':
+                    progress_store[section_id] = {'percent': 100, 'status': 'finished'}
+            
+            ydl_opts['progress_hooks'] = [section_hook]
+            
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl: ydl.download([url])
+        except Exception as e: 
+            print(f"Error cutting: {str(e)}")
+            progress_store[section_id] = {'percent': 0, 'status': 'error'}
+            
+    threading.Thread(target=run_download).start()
+    return jsonify({'success': True, 'task_id': section_id})
 
 @app.route('/api/progress-all', methods=['POST'])
 def get_all_progress():
@@ -246,6 +292,15 @@ def delete_file():
             if filename in filenames: os.remove(os.path.join(root, filename)); return jsonify({'success': True})
         return jsonify({'error': 'Não encontrado'}), 404
     except Exception as e: return jsonify({'error': str(e)}), 500
+
+@app.route('/api/stream/<path:filename>')
+def stream_file(filename):
+    """Serve ficheiros para o player do navegador."""
+    # Procura o ficheiro na pasta de downloads (incluindo subpastas)
+    for root, dirs, filenames in os.walk(DOWNLOAD_FOLDER):
+        if filename in filenames:
+            return send_file(os.path.join(root, filename))
+    return "Ficheiro não encontrado", 404
 
 @app.route('/')
 def index(): return app.send_static_file('index.html')

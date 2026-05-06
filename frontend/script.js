@@ -17,6 +17,8 @@ const resourcesSection = document.getElementById('resources-section');
 const resourcesList = document.getElementById('resources-list');
 const videoDescription = document.getElementById('video-description');
 const toggleDescBtn = document.getElementById('toggle-desc');
+const chaptersSection = document.getElementById('chapters-section');
+const chaptersList = document.getElementById('chapters-list');
 
 // Elementos do Modal de Cookies
 const settingsBtn = document.getElementById('settings-btn');
@@ -35,6 +37,13 @@ const confirmText = document.getElementById('confirm-text');
 const confirmOk = document.getElementById('confirm-ok');
 const confirmCancel = document.getElementById('confirm-cancel');
 const closeXBtn = document.getElementById('close-modal-x');
+const playerModal = document.getElementById('player-modal');
+const videoPlayer = document.getElementById('video-player');
+const audioPlayer = document.getElementById('audio-player');
+const playerTitle = document.getElementById('player-title');
+const closePlayerBtn = document.getElementById('close-player');
+const closePlayerX = document.getElementById('close-player-x');
+const downloadPlayerBtn = document.getElementById('download-player-btn');
 
 let activeTasks = new Set();
 let currentPlaylistTitle = "";
@@ -207,6 +216,29 @@ async function fetchInfo() {
         currentPathDisplay.innerText = data.current_path;
         
         extractResources(data.description, resourcesList, resourcesSection);
+        
+        // Processar Capítulos
+        chaptersList.innerHTML = "";
+        if (data.chapters && data.chapters.length > 0) {
+            chaptersSection.classList.remove('hidden');
+            data.chapters.forEach(ch => {
+                const item = document.createElement('div');
+                item.className = 'chapter-item';
+                item.innerHTML = `
+                    <div class="chapter-info">
+                        <span class="chapter-title">${ch.title}</span>
+                        <span class="chapter-time">${formatTime(ch.start_time)} - ${formatTime(ch.end_time)}</span>
+                    </div>
+                    <button class="btn-cut" onclick="downloadChapter('${data.url}', '${data.id}', ${ch.start_time}, ${ch.end_time}, '${ch.title.replace(/'/g, "\\'")}')">
+                        <i class="fa-solid fa-scissors"></i> Recortar
+                    </button>
+                `;
+                chaptersList.appendChild(item);
+            });
+        } else {
+            chaptersSection.classList.add('hidden');
+        }
+
         downloadQueue.innerHTML = "";
         const entries = data.is_playlist ? data.entries : [{url: data.url, title: data.title, id: data.id, thumbnail: data.thumbnail, channel: data.channel}];
         entries.forEach(entry => addVideoToQueue(entry));
@@ -323,8 +355,46 @@ async function loadHistory() {
     const res = await fetch('/api/history');
     const data = await res.json();
     currentPathDisplay.innerText = data.current_path;
-    historyList.innerHTML = data.files.map(f => `<div class="history-item"><div class="file-name">${f.name}</div><button class="delete-btn" onclick="deleteHistoryFile('${f.name}')"><i class="fa-solid fa-trash"></i></button></div>`).join('');
+    historyList.innerHTML = data.files.map(f => `
+        <div class="history-item">
+            <div class="file-name" title="${f.name}">${f.name}</div>
+            <div class="history-actions">
+                ${f.name.endsWith('.zip') ? '' : `<button class="play-btn" onclick="openPlayer('${f.name}')" title="Reproduzir"><i class="fa-solid fa-play"></i></button>`}
+                <button class="delete-btn" onclick="deleteHistoryFile('${f.name}')" title="Apagar"><i class="fa-solid fa-trash"></i></button>
+            </div>
+        </div>`).join('');
 }
+
+function openPlayer(filename) {
+    const streamUrl = `/api/stream/${encodeURIComponent(filename)}`;
+    playerTitle.innerText = filename;
+    downloadPlayerBtn.href = streamUrl;
+    
+    const isAudio = filename.toLowerCase().endsWith('.mp3');
+    if (isAudio) {
+        videoPlayer.classList.add('hidden');
+        audioPlayer.classList.remove('hidden');
+        audioPlayer.src = streamUrl;
+        audioPlayer.play();
+    } else {
+        audioPlayer.classList.add('hidden');
+        videoPlayer.classList.remove('hidden');
+        videoPlayer.src = streamUrl;
+        videoPlayer.play();
+    }
+    playerModal.classList.remove('hidden');
+}
+
+const closePlayerFunc = () => {
+    playerModal.classList.add('hidden');
+    videoPlayer.pause();
+    audioPlayer.pause();
+    videoPlayer.src = "";
+    audioPlayer.src = "";
+};
+
+closePlayerBtn.onclick = closePlayerFunc;
+closePlayerX.onclick = closePlayerFunc;
 
 async function deleteHistoryFile(name) {
     const confirmed = await showConfirm("Apagar Ficheiro?", `Deseja remover permanentemente "${name}"?`);
@@ -336,6 +406,30 @@ async function deleteHistoryFile(name) {
 
 function sendBrowserNotification(title, body) { if (Notification.permission === 'granted') new Notification(title, { body }); }
 function updateQueueCount() { queueCount.innerText = `${document.querySelectorAll('.queue-item').length} itens`; }
+
+function formatTime(seconds) {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    return [h, m, s].map(v => v < 10 ? "0" + v : v).filter((v, i) => v !== "00" || i > 0).join(":");
+}
+
+async function downloadChapter(url, id, start, end, title) {
+    try {
+        const res = await fetch('/api/download-section', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url, id, start, end, title, format: formatSelect.value })
+        });
+        const data = await res.json();
+        if (data.success) {
+            Notify.show("Corte Iniciado", `A baixar: ${title}`, "info");
+            // Adiciona uma task fantasma para acompanhar o progresso (opcional, ou apenas confia no backend)
+            activeTasks.add(data.task_id);
+        }
+    } catch (err) { Notify.show("Erro ao Cortar", err.message, "error"); }
+}
+
 document.getElementById('open-folder-btn').onclick = () => fetch('/api/open-folder', {method: 'POST'});
 document.getElementById('refresh-history').onclick = loadHistory;
 document.getElementById('change-folder-btn').onclick = async () => {

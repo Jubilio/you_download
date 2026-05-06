@@ -70,11 +70,17 @@ header { margin-bottom: 30px; display: flex; justify-content: space-between; ali
 #format-select { background: rgba(0,0,0,0.4); color: white; border: 1px solid var(--glass-border); border-radius: 8px; padding: 5px 10px; }
 
 /* Recursos Extras */
-.resources-section { margin-top: 20px; padding: 15px; background: rgba(99, 102, 241, 0.05); border-radius: 12px; border: 1px dashed var(--primary); }
-.resources-section h4 { font-size: 0.9rem; margin-bottom: 10px; color: var(--text-dim); }
-.resources-list { display: flex; flex-wrap: wrap; gap: 10px; }
-.resource-link { background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 8px 15px; border-radius: 10px; font-size: 0.85rem; color: var(--text-main); text-decoration: none; display: flex; align-items: center; gap: 8px; transition: 0.3s; }
-.resource-link:hover { background: var(--primary); transform: translateY(-2px); }
+.resources-section, .chapters-section { margin-top: 20px; padding: 15px; background: rgba(99, 102, 241, 0.05); border-radius: 12px; border: 1px dashed var(--primary); }
+.resources-section h4, .chapters-section h4 { font-size: 0.9rem; margin-bottom: 10px; color: var(--text-dim); }
+
+.chapters-list { display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; padding-right: 5px; }
+.chapter-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(255,255,255,0.03); border-radius: 10px; border: 1px solid transparent; transition: 0.3s; }
+.chapter-item:hover { background: rgba(255,255,255,0.06); border-color: var(--primary); }
+.chapter-info { display: flex; flex-direction: column; }
+.chapter-title { font-size: 0.85rem; font-weight: 600; color: var(--text-main); }
+.chapter-time { font-size: 0.75rem; color: var(--primary); font-family: monospace; }
+.btn-cut { background: var(--primary); border: none; color: white; padding: 5px 12px; border-radius: 6px; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: 0.2s; }
+.btn-cut:hover { background: var(--primary-hover); transform: scale(1.05); }
 
 /* Descrição */
 .description-container { margin-top: 20px; }
@@ -131,11 +137,22 @@ header { margin-bottom: 30px; display: flex; justify-content: space-between; ali
 #change-folder-btn { background: transparent; border: none; color: var(--primary); cursor: pointer; }
 
 .history-list { display: flex; flex-direction: column; gap: 10px; max-height: 500px; overflow-y: auto; }
-.history-item { display: flex; align-items: center; gap: 12px; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 10px; position: relative; }
-.history-item:hover { background: rgba(255,255,255,0.05); }
-.file-name { font-size: 0.85rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.delete-btn { opacity: 0; position: absolute; right: 10px; background: var(--danger); border: none; color: white; border-radius: 5px; padding: 5px; cursor: pointer; }
-.history-item:hover .delete-btn { opacity: 1; }
+.history-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 12px; transition: 0.3s; border: 1px solid transparent; }
+.history-item:hover { background: rgba(255,255,255,0.06); border-color: var(--glass-border); }
+.file-name { font-size: 0.8rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-main); }
+.history-actions { display: flex; gap: 8px; align-items: center; }
+.play-btn, .delete-btn { background: rgba(255,255,255,0.05); border: none; color: white; border-radius: 8px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; font-size: 0.8rem; }
+.play-btn { color: var(--success); }
+.play-btn:hover { background: var(--success); color: white; transform: scale(1.1); }
+.delete-btn { color: var(--danger); }
+.delete-btn:hover { background: var(--danger); color: white; transform: scale(1.1); }
+
+/* Modal Player */
+.player-content { width: 800px !important; max-width: 95vw; }
+.media-container { margin: 20px 0; background: #000; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; min-height: 200px; }
+video, audio { display: block; border-radius: 8px; }
+video { max-height: 60vh; background: #000; }
+audio { padding: 20px; width: 100%; }
 
 /* --- SISTEMA DE ALERTAS FUTURISTAS --- */
 .notification-container {

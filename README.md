@@ -16,6 +16,7 @@ Um dashboard desktop-like de última geração para download de mídia do YouTub
 - 🍪 **Smart Cookie Sync**: Sincronização em um clique com cookies do navegador Edge para evitar bloqueios.
 - 📦 **Smart Bundling**: Playlists são automaticamente compactadas em arquivos `.zip` organizados.
 - 🔗 **Resource Extraction**: Identifica e extrai links úteis (Drive, PDF, Mega) diretamente da descrição do vídeo.
+- ✂️ **Smart Clipping**: Deteta automaticamente capítulos em vídeos longos e permite baixar apenas o trecho que lhe interessa.
 - 🔔 **Notificações Modernas**: Alertas elegantes estilo "Toast" e suporte a notificações nativas do sistema.
 - 📂 **Gerenciador de Arquivos**: Visualize, abra pastas e apague downloads diretamente pelo dashboard.
 

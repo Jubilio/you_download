@@ -62,6 +62,22 @@
             </div>
         </div>
 
+        <!-- Modal de Player -->
+        <div id="player-modal" class="modal hidden">
+            <div class="modal-content glass player-content">
+                <button id="close-player-x" class="close-x-btn">&times;</button>
+                <h3 id="player-title">Reproduzir Mídia</h3>
+                <div class="media-container">
+                    <video id="video-player" controls class="w-100"></video>
+                    <audio id="audio-player" controls class="w-100 hidden"></audio>
+                </div>
+                <div class="modal-footer">
+                    <button id="close-player" class="btn-text-only">Fechar</button>
+                    <a id="download-player-btn" href="" download class="btn-primary"><i class="fa-solid fa-download"></i> Descarregar</a>
+                </div>
+            </div>
+        </div>
+
         <main class="dashboard-grid">
             <section class="main-column">
                 <!-- Entrada de URL -->
@@ -100,6 +116,12 @@
                         <div id="resources-section" class="resources-section hidden">
                             <h4><i class="fa-solid fa-paperclip"></i> Materiais Extras Detetados:</h4>
                             <div id="resources-list" class="resources-list"></div>
+                        </div>
+
+                        <!-- Nova secção de Capítulos -->
+                        <div id="chapters-section" class="chapters-section hidden">
+                            <h4><i class="fa-solid fa-bookmark"></i> Capítulos detetados (Baixar Recorte):</h4>
+                            <div id="chapters-list" class="chapters-list"></div>
                         </div>
 
                         <!-- Descrição Expansível -->
