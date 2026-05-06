@@ -41,6 +41,10 @@ const helpModal = document.getElementById('help-modal');
 const closeHelp = document.getElementById('close-help');
 const closeHelpX = document.getElementById('close-help-x');
 
+const historySearch = document.getElementById('history-search');
+const notifySound = document.getElementById('notify-sound');
+const ambientOverlay = document.getElementById('ambient-overlay');
+
 // Elementos de Notificação e Confirm
 const notificationContainer = document.getElementById('notification-container');
 const confirmOverlay = document.getElementById('confirm-overlay');
@@ -65,16 +69,52 @@ const placeholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg
 // --- SISTEMA DE NOTIFICAÇÕES ---
 
 const Notify = {
-    show(title, message, type = 'info') {
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        const icons = { success: 'fa-circle-check', error: 'fa-circle-xmark', info: 'fa-circle-info' };
-        toast.innerHTML = `<div class="toast-icon"><i class="fa-solid ${icons[type]}"></i></div><div class="toast-content"><h4>${title}</h4><p>${message}</p></div>`;
-        notificationContainer.appendChild(toast);
-        setTimeout(() => toast.classList.add('show'), 100);
-        setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 500); }, 4000);
+    show: (title, message, type = 'info') => {
+        const id = Date.now();
+        const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
+        
+        const html = `
+            <div class="notification ${type}" id="notif-${id}">
+                <i class="fa-solid ${icon}"></i>
+                <div class="notification-content">
+                    <div class="notification-title">${title}</div>
+                    <div class="notification-message">${message}</div>
+                </div>
+            </div>
+        `;
+        
+        notificationContainer.insertAdjacentHTML('afterbegin', html);
+        const el = document.getElementById(`notif-${id}`);
+        setTimeout(() => el.classList.add('show'), 10);
+        setTimeout(() => {
+            el.classList.remove('show');
+            setTimeout(() => el.remove(), 500);
+        }, 4000);
+
+        if (type === 'success' && notifySound) {
+            notifySound.currentTime = 0;
+            notifySound.play().catch(e => console.log("Áudio bloqueado pelo browser"));
+        }
     }
 };
+
+historySearch.addEventListener('input', () => loadHistory());
+
+function applyAmbientGlow(imgUrl) {
+    if (!imgUrl) return;
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.src = imgUrl;
+    img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 1; canvas.height = 1;
+        ctx.drawImage(img, 0, 0, 1, 1);
+        const data = ctx.getImageData(0, 0, 1, 1).data;
+        document.documentElement.style.setProperty('--ambient-color', `rgb(${data[0]}, ${data[1]}, ${data[2]})`);
+        ambientOverlay.style.opacity = '0.3';
+    };
+}
 
 function showConfirm(title, text) {
     return new Promise((resolve) => {
@@ -277,6 +317,10 @@ async function fetchInfo() {
         videoThumbnail.src = data.thumbnail || "";
         videoChannel.innerText = data.channel;
         videoDescription.innerHTML = linkify(data.description);
+        
+        // Aplicar Ambient Glow baseado na thumbnail
+        applyAmbientGlow(data.thumbnail);
+
         currentPlaylistTitle = data.is_playlist ? data.title : "";
         currentPathDisplay.innerText = data.current_path;
         
