@@ -24,6 +24,16 @@ NODE_PATH = r'C:\Program Files\nodejs\node.exe'
 
 progress_store = {}
 
+def check_ffmpeg():
+    try:
+        subprocess.run(['ffmpeg', '-version'], capture_output=True, check=True)
+        return True
+    except:
+        return False
+
+HAS_FFMPEG = check_ffmpeg()
+print(f"[System] FFmpeg detetado: {HAS_FFMPEG}")
+
 def clean_ansi(text):
     if not text: return ""
     return re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', text)
@@ -211,6 +221,12 @@ def download_single():
 
 @app.route('/api/download-section', methods=['POST'])
 def download_section():
+    if not HAS_FFMPEG:
+        return jsonify({
+            'success': False, 
+            'message': 'FFmpeg não detetado! O recorte de vídeos requer o FFmpeg instalado no sistema. Por favor, instale-o (ex: winget install ffmpeg) e reinicie o app.'
+        }), 400
+        
     data = request.json
     url, video_id, format_type = data.get('url'), data.get('id'), data.get('format', 'mp4')
     start, end, title = data.get('start'), data.get('end'), data.get('title', 'clip')
@@ -223,16 +239,26 @@ def download_section():
             progress_store[section_id] = {'percent': 0, 'status': 'starting'}
             out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"%(title)s - {title}.%(ext)s")
             
-            # Formata a seção para o yt-dlp
-            section_str = f"*{start}-{end}"
+            # Formata a seção para o yt-dlp (formato string robusto)
+            # Ex: "*00:00:00-00:10:00"
+            def to_time(s):
+                h = int(s // 3600)
+                m = int((s % 3600) // 60)
+                s = int(s % 60)
+                return f"{h:02d}:{m:02d}:{s:02d}"
+
+            section_str = f"*{to_time(start)}-{to_time(end)}"
             
             ydl_opts = {
                 **get_common_opts(), 
                 'format': 'bestvideo+bestaudio/best' if format_type == 'mp4' else 'bestaudio/best', 
                 'outtmpl': out_tmpl, 
                 'download_sections': [section_str],
-                'force_keyframes_at_cuts': True, # Garante corte limpo
-                'nopart': True
+                'force_keyframes_at_cuts': True,
+                'nopart': True,
+                # Forçar o uso do ffmpeg para extrair apenas o fragmento necessário
+                # Isso evita baixar o vídeo inteiro se o servidor suportar
+                'concurrent_fragment_downloads': 5,
             }
             
             # Sobrescreve o progress_hook para usar o section_id
