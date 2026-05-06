@@ -66,8 +66,28 @@ header { margin-bottom: 30px; display: flex; justify-content: space-between; ali
 .help-footer { margin-top: 20px; border-top: 1px solid var(--glass-border); padding-top: 15px; }
 .help-footer p { font-size: 0.75rem; color: var(--text-dim); margin-bottom: 15px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; }
 
-.dashboard-grid { display: grid; grid-template-columns: 1fr 380px; gap: 30px; }
-.glass { background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: 20px; padding: 25px; }
+/* Responsive Grid */
+.dashboard-grid { 
+    display: grid; 
+    grid-template-columns: 1fr 380px; 
+    gap: 30px; 
+}
+
+@media (max-width: 1100px) {
+    .dashboard-grid { grid-template-columns: 1fr; }
+    .side-column { order: 2; }
+    .main-column { order: 1; }
+}
+
+@media (max-width: 600px) {
+    .app-container { padding: 15px; }
+    .video-info-wrapper { flex-direction: column; align-items: center; text-align: center; }
+    #video-thumbnail { width: 100%; max-width: 300px; }
+    .download-controls { flex-direction: column; }
+    .modal-content { width: 95vw; padding: 20px; }
+}
+
+.glass { background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: 20px; padding: 25px; max-width: 100%; overflow: hidden; }
 
 /* Cards */
 .main-card { margin-bottom: 30px; }
@@ -88,6 +108,22 @@ header { margin-bottom: 30px; display: flex; justify-content: space-between; ali
 
 /* Recursos Extras */
 .resources-section, .chapters-section { margin-top: 20px; padding: 15px; background: rgba(99, 102, 241, 0.05); border-radius: 12px; border: 1px dashed var(--primary); }
+#video-description { 
+    margin-top: 10px; 
+    padding: 15px; 
+    background: rgba(0,0,0,0.2); 
+    border-radius: 10px; 
+    font-family: inherit; 
+    font-size: 0.85rem; 
+    white-space: pre-wrap; 
+    word-break: break-word; 
+    overflow-wrap: anywhere;
+    max-height: 300px; 
+    overflow-y: auto; 
+    color: var(--text-dim); 
+    line-height: 1.6; 
+    max-width: 100%;
+}
 .resources-section h4, .chapters-section h4 { font-size: 0.9rem; margin-bottom: 10px; color: var(--text-dim); }
 
 .chapters-list { display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; padding-right: 5px; }
@@ -108,13 +144,81 @@ header { margin-bottom: 30px; display: flex; justify-content: space-between; ali
 .help-text-xs { font-size: 0.7rem; color: var(--text-dim); margin-top: 5px; line-height: 1.4; }
 
 /* Descrição */
-.description-container { margin-top: 20px; }
-.desc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
-.btn-text-only { background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 5px; transition: 0.2s; }
-.btn-text-only:hover { color: var(--primary); }
-#video-description { margin-top: 10px; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 10px; font-family: inherit; font-size: 0.85rem; white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto; color: var(--text-dim); line-height: 1.6; }
-.desc-link { color: var(--primary); text-decoration: none; font-weight: 600; transition: 0.3s; }
-.desc-link:hover { text-decoration: underline; color: var(--primary-hover); }
+/* Futuristic Icons & Buttons */
+i { 
+    transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+    background: linear-gradient(135deg, #fff 30%, var(--primary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 1px rgba(255,255,255,0.3));
+}
+
+.control-btn, .btn-icon, .side-actions button, .btn-text-only i {
+    filter: drop-shadow(0 0 2px rgba(99, 102, 241, 0.3));
+}
+
+.control-btn:hover i, .btn-icon:hover i {
+    filter: drop-shadow(0 0 8px var(--primary));
+    transform: scale(1.1);
+}
+
+.logo i {
+    filter: drop-shadow(0 0 15px var(--primary));
+    animation: pulse-glow 3s infinite alternate;
+}
+
+@keyframes pulse-glow {
+    from { filter: drop-shadow(0 0 5px var(--primary)); opacity: 0.8; }
+    to { filter: drop-shadow(0 0 20px var(--primary)); opacity: 1; }
+}
+
+/* Glassmorphism Buttons */
+.control-btn {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.control-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--primary);
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+}
+
+.btn-primary {
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+}
+
+.btn-primary::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+    transform: rotate(45deg);
+    transition: 0.5s;
+    pointer-events: none;
+}
+
+.btn-primary:hover::after {
+    left: 100%;
+}
+
+.desc-link { color: var(--primary); text-decoration: none; font-weight: 600; transition: 0.3s; position: relative; }
+.desc-link::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 0; height: 1px; background: var(--primary); transition: 0.3s; }
+.desc-link:hover::after { width: 100%; }
 
 /* Fila de Downloads */
 .queue-section { margin-top: 20px; }
@@ -182,6 +286,7 @@ header { margin-bottom: 30px; display: flex; justify-content: space-between; ali
     margin-bottom: 8px;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     line-height: 1.4;

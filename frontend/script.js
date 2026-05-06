@@ -70,7 +70,7 @@ const socket = io();
 
 socket.on('progress', (progress) => {
     const { id, percent, status, speed, eta } = progress;
-    const card = document.querySelector(`.card[data-id="${id}"]`);
+    const card = document.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
     if (!card) return;
 
     const fill = card.querySelector('.card-progress-fill');
@@ -487,16 +487,33 @@ async function toggleItemDetails(id) {
 }
 
 async function startDownloadItem(id) {
-    const item = document.querySelector(`.queue-item[data-id="${id}"]`);
+    // Procura por .card em vez de .queue-item para consistência com o novo design
+    const item = document.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
     if (!item || item.dataset.status === 'downloading') return;
+    
     item.dataset.status = 'downloading';
-    item.querySelector('.item-checkbox').disabled = true;
-    item.querySelector('.status-badge').innerText = "Iniciando...";
-    item.querySelector('.control-btn i').className = "fa-solid fa-spinner fa-spin";
+    const badge = item.querySelector('.card-status');
+    const fill = item.querySelector('.card-progress-fill');
+    
+    if (badge) badge.innerText = "Iniciando...";
     activeTasks.add(id);
+    
     try {
-        await fetch('/api/download-single', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, url: item.dataset.url, format: formatSelect.value, playlist_title: currentPlaylistTitle }) });
-    } catch (err) { item.dataset.status = 'error'; item.querySelector('.status-badge').innerText = "Erro!"; activeTasks.delete(id); }
+        await fetch('/api/download-single', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ 
+                id, 
+                url: item.dataset.url, 
+                format: formatSelect.value, 
+                playlist_title: currentPlaylistTitle 
+            }) 
+        });
+    } catch (err) { 
+        if (badge) badge.innerText = "Erro!"; 
+        item.dataset.status = 'error'; 
+        activeTasks.delete(id); 
+    }
 }
 
 // Polling removido em favor do Socket.IO

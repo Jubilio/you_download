@@ -88,20 +88,28 @@ def make_progress_hook(task_id):
         if d['status'] == 'downloading':
             downloaded = d.get('downloaded_bytes', 0)
             total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
+            
+            # Se não houver total, tenta usar fragmentos se for HLS/Dash
+            if not total and 'fragment_count' in d:
+                total = d.get('fragment_count', 0)
+                downloaded = d.get('fragment_index', 0)
+
             percent = (downloaded / total * 100) if total > 0 else 0
             
-            # Log no terminal para observabilidade
-            print(f"[{task_id}] {percent:.1f}% | {clean_ansi(d.get('_speed_str', 'N/A'))} | ETA: {clean_ansi(d.get('_eta_str', 'N/A'))}")
+            # Log forçado no console para debugar
+            speed = clean_ansi(d.get('_speed_str', 'N/A'))
+            eta = clean_ansi(d.get('_eta_str', 'N/A'))
+            print(f">>> [PROGRESO {task_id}] {percent:.1f}% | {speed} | ETA: {eta}")
 
             socketio.emit('progress', {
                 'id': task_id,
                 'percent': round(percent, 1),
-                'speed': clean_ansi(d.get('_speed_str', '0B/s')),
-                'eta': clean_ansi(d.get('_eta_str', '00:00')),
+                'speed': speed,
+                'eta': eta,
                 'status': 'downloading'
             })
         elif d['status'] == 'finished':
-            print(f"[{task_id}] Download concluído. Iniciando processamento/merge...")
+            print(f">>> [FINALIZADO {task_id}]")
             socketio.emit('progress', {'id': task_id, 'percent': 100, 'status': 'processing'})
     return hook
 
@@ -350,6 +358,11 @@ def download_single():
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
+                if not info:
+                    # Se info for None, o yt-dlp provavelmente saltou o download (já no archive)
+                    socketio.emit('progress', {'id': video_id, 'percent': 100, 'status': 'finished'})
+                    return
+
                 final_filename = ydl.prepare_filename(info)
                 # O merge_output_format pode mudar a extensão, vamos garantir o nome real
                 if format_type == 'mp4' and not final_filename.endswith('.mp4'):
@@ -424,8 +437,10 @@ def download_section():
             
             ydl_opts = {
                 **get_common_opts(), 
+                'download_archive': None, 
                 'format': 'bestvideo+bestaudio/best' if format_type == 'mp4' else 'bestaudio/best', 
                 'outtmpl': out_tmpl, 
+                'merge_output_format': 'mp4' if format_type == 'mp4' else None, # Forçar MP4 para o player
                 'force_keyframes_at_cuts': True,
                 'nopart': True,
                 'download_ranges': yt_dlp.utils.download_range_func(None, [(start, end)]),
@@ -437,6 +452,9 @@ def download_section():
             
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
+                if not info:
+                    raise Exception("Vídeo já descarregado ou não disponível (yt-dlp retornou vazio).")
+                    
                 final_filename = ydl.prepare_filename(info)
                 if format_type == 'mp4' and not final_filename.endswith('.mp4'):
                     final_filename = os.path.splitext(final_filename)[0] + '.mp4'
@@ -553,11 +571,26 @@ def clear_history():
 
 @app.route('/api/stream/<path:filename>')
 def stream_file(filename):
-    """Serve ficheiros para o player do navegador."""
+    """Serve ficheiros para o player do navegador com suporte a busca flexível."""
+    import urllib.parse
+    
+    # Descodificar o nome do ficheiro (caso venha com %20, etc)
+    decoded_name = urllib.parse.unquote(filename)
+    base_name = os.path.splitext(decoded_name)[0]
+    
+    print(f"[Stream] Procurando por: {decoded_name}")
+    
     # Procura o ficheiro na pasta de downloads (incluindo subpastas)
     for root, dirs, filenames in os.walk(DOWNLOAD_FOLDER):
-        if filename in filenames:
-            return send_file(os.path.join(root, filename))
+        # 1. Procura exata
+        if decoded_name in filenames:
+            return send_file(os.path.join(root, decoded_name))
+        
+        # 2. Procura pelo nome base (caso a extensão tenha mudado de .mkv para .mp4 no pedido)
+        for f in filenames:
+            if os.path.splitext(f)[0] == base_name:
+                return send_file(os.path.join(root, f))
+                
     return "Ficheiro não encontrado", 404
 
 @app.route('/')
