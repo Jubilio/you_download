@@ -116,6 +116,7 @@ header { margin-bottom: 30px; display: flex; justify-content: space-between; ali
 
 /* Detalhes Expansíveis do Item */
 .item-details-panel { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.8rem; }
+.item-details-header { display: flex; justify-content: flex-end; margin-bottom: 8px; }
 .item-desc-text { color: var(--text-dim); white-space: pre-wrap; max-height: 150px; overflow-y: auto; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 8px; margin-bottom: 10px; line-height: 1.4; }
 .item-resources { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 

@@ -203,18 +203,29 @@ downloadDescBtn.addEventListener('click', () => {
     const text = videoDescription.innerText;
     const title = videoTitle.innerText || "descricao";
     if (!text) return Notify.show("Aviso", "Analise um vídeo primeiro.", "error");
-    
+    saveTextAsFile(text, `${title}_descricao.txt`);
+    Notify.show("Sucesso", "Descrição exportada!", "success");
+});
+
+function saveTextAsFile(text, filename) {
     const blob = new Blob([text], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${title.replace(/[\\/:*?"<>|]/g, "")}_descricao.txt`;
+    a.download = filename.replace(/[\\/:*?"<>|]/g, "");
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+function downloadText(id, title) {
+    const panel = document.getElementById(`details-${id}`);
+    const text = panel.querySelector('.item-desc-text').innerText;
+    if (text === "Carregando detalhes..." || !text) return Notify.show("Aguarde", "Carregando informações...", "info");
+    saveTextAsFile(text, `${title}_descricao.txt`);
     Notify.show("Sucesso", "Descrição exportada!", "success");
-});
+}
 
 async function fetchInfo() {
     const url = urlInput.value.trim();
@@ -318,6 +329,11 @@ function addVideoToQueue(video) {
                 </div>
             </div>
             <div class="item-details-panel hidden" id="details-${video.id}">
+                <div class="item-details-header">
+                    <button class="btn-text-only btn-sm" onclick="downloadText('${video.id}', '${video.title.replace(/'/g, "\\'")}')">
+                        <i class="fa-solid fa-file-export"></i> Baixar Descrição
+                    </button>
+                </div>
                 <div class="item-desc-text">Carregando detalhes...</div>
                 <div class="item-resources"></div>
             </div>
