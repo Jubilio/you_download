@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouDown | Manager</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="background-animation">
+        <div class="circle"></div>
+        <div class="circle"></div>
+    </div>
+
+    <div class="app-container">
+        <header>
+            <div class="logo">
+                <i class="fa-solid fa-cloud-arrow-down"></i>
+                <h1>You<span>Down</span></h1>
+            </div>
+            <div class="header-actions">
+                <button id="settings-btn" class="control-btn" title="Configurações"><i class="fa-solid fa-cog"></i></button>
+            </div>
+        </header>
+
+        <!-- Modal de Cookies -->
+        <div id="cookies-modal" class="modal hidden">
+            <div class="modal-content glass">
+                <button id="close-modal-x" class="close-x-btn">&times;</button>
+                <h3><i class="fa-solid fa-cookie-bite"></i> Autenticação (Cookies)</h3>
+                <p>Para baixar vídeos restritos ou playlists longas, precisamos que o YouDown "pense" que é você no navegador.</p>
+                
+                <div class="sync-methods">
+                    <button id="sync-cookies-btn" class="btn-success w-100"><i class="fa-solid fa-sync"></i> Tentativa Automática (Feche o Browser)</button>
+                    
+                    <div class="divider"><span>OU MÉTODO MANUAL</span></div>
+                    
+                    <div class="manual-guide">
+                        <ol>
+                            <li>Instale a extensão <a href="https://chrome.google.com/webstore/detail/get-cookiestxt-locally/ccmclabimipke%E6%8A%BD%E7%8D%8E%E6%8A%BD%E7%8D%8Emjjnldpcclebedia" target="_blank">Get cookies.txt</a></li>
+                            <li>No YouTube, clique na extensão e <b>copie o conteúdo</b>.</li>
+                            <li>Cole no campo abaixo ou <b>arraste o ficheiro</b> aqui.</li>
+                        </ol>
+                    </div>
+
+                    <div id="drop-zone" class="drop-zone">
+                        <i class="fa-solid fa-file-import"></i>
+                        <p>Cole o texto aqui ou arraste o cookies.txt</p>
+                        <textarea id="cookies-input" placeholder="Netscape HTTP Cookie File..."></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button id="close-modal" class="btn-text-only">Sair</button>
+                    <button id="save-cookies-btn" class="btn-primary">Ativar Cookies</button>
+                </div>
+            </div>
+        </div>
+
+        <main class="dashboard-grid">
+            <section class="main-column">
+                <!-- Entrada de URL -->
+                <div class="main-card glass">
+                    <div class="input-group">
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-link"></i>
+                            <input type="url" id="url-input" placeholder="Cole o link do vídeo ou playlist aqui...">
+                        </div>
+                        <button id="fetch-btn" class="btn-primary">Analisar</button>
+                    </div>
+
+                    <div id="loader" class="loader-container hidden">
+                        <div class="spinner"></div>
+                        <p>Extraindo informações...</p>
+                    </div>
+
+                    <!-- Preview e Botão Global -->
+                    <div id="preview-section" class="preview-card hidden">
+                        <div class="video-info-wrapper">
+                            <img id="video-thumbnail" src="" alt="Thumbnail">
+                            <div class="video-details">
+                                <h2 id="video-title">Título</h2>
+                                <p id="video-channel">Canal</p>
+                                <div class="download-controls">
+                                    <select id="format-select">
+                                        <option value="mp4">Vídeo MP4</option>
+                                        <option value="mp3">Áudio MP3</option>
+                                    </select>
+                                    <button id="download-all-btn" class="btn-success">Baixar Tudo</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Nova secção de Recursos Extras -->
+                        <div id="resources-section" class="resources-section hidden">
+                            <h4><i class="fa-solid fa-paperclip"></i> Materiais Extras Detetados:</h4>
+                            <div id="resources-list" class="resources-list"></div>
+                        </div>
+
+                        <!-- Descrição Expansível -->
+                        <div class="description-container">
+                            <button id="toggle-desc" class="btn-text-only">Ver Descrição Completa <i class="fa-solid fa-chevron-down"></i></button>
+                            <pre id="video-description" class="hidden"></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fila de Downloads Ativos -->
+                <div class="queue-section">
+                    <div class="section-header">
+                        <div class="header-left">
+                            <h3><i class="fa-solid fa-list-check"></i> Fila de Downloads</h3>
+                            <span id="queue-count">0 itens</span>
+                        </div>
+                        <div class="header-actions">
+                            <label class="select-all-wrapper">
+                                <input type="checkbox" id="select-all-checkbox">
+                                <span>Selecionar Tudo</span>
+                            </label>
+                            <button id="download-selected-btn" class="btn-success btn-sm">Baixar Selecionados</button>
+                        </div>
+                    </div>
+                    <div id="download-queue" class="download-queue">
+                        <!-- Items de download entram aqui -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sidebar -->
+            <aside class="side-column">
+                <div class="side-card glass">
+                    <div class="side-header">
+                        <h3><i class="fa-solid fa-history"></i> Concluídos</h3>
+                        <div class="side-actions">
+                            <button id="open-folder-btn" title="Abrir pasta"><i class="fa-solid fa-folder-open"></i></button>
+                            <button id="refresh-history" title="Atualizar"><i class="fa-solid fa-rotate"></i></button>
+                        </div>
+                    </div>
+                    <div class="path-config">
+                        <p><i class="fa-solid fa-location-dot"></i> A salvar em:</p>
+                        <div class="path-display">
+                            <span id="current-path">...</span>
+                            <button id="change-folder-btn"><i class="fa-solid fa-pen"></i></button>
+                        </div>
+                    </div>
+                    <div id="history-list" class="history-list"></div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <div id="notification-container" class="notification-container"></div>
+
+    <div id="confirm-overlay" class="modal-overlay">
+        <div class="confirm-dialog">
+            <div class="confirm-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <h3 id="confirm-title">Confirmar Ação</h3>
+            <p id="confirm-text">Deseja realmente prosseguir?</p>
+            <div class="confirm-buttons">
+                <button id="confirm-cancel" class="btn-cancel">Cancelar</button>
+                <button id="confirm-ok" class="btn-confirm-action">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

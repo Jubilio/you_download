@@ -1,0 +1,241 @@
+from flask import Flask, request, jsonify, send_file
+from flask_cors import CORS
+import yt_dlp
+import os
+import threading
+import time
+import subprocess
+import tkinter as tk
+from tkinter import filedialog
+import re
+import traceback
+
+app = Flask(__name__, static_folder='frontend', static_url_path='')
+CORS(app)
+
+DOWNLOAD_FOLDER = os.path.join(os.path.expanduser("~"), "Downloads")
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+
+COOKIES_FILE = os.path.join(os.getcwd(), 'cookies.txt')
+ARCHIVE_FILE = os.path.join(os.getcwd(), 'downloaded_history.txt')
+NODE_PATH = r'C:\Program Files\nodejs\node.exe'
+
+progress_store = {}
+
+def clean_ansi(text):
+    if not text: return ""
+    return re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', text)
+
+def progress_hook(d):
+    video_id = d.get('info_dict', {}).get('id')
+    if not video_id: return
+    if d['status'] == 'downloading':
+        downloaded = d.get('downloaded_bytes', 0)
+        total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
+        percent = (downloaded / total * 100) if total > 0 else 0
+        progress_store[video_id] = {
+            'percent': round(percent, 1),
+            'speed': clean_ansi(d.get('_speed_str', '0B/s')),
+            'eta': clean_ansi(d.get('_eta_str', '00:00')),
+            'status': 'downloading'
+        }
+    elif d['status'] == 'finished':
+        progress_store[video_id] = {'percent': 100, 'status': 'finished'}
+
+def get_common_opts():
+    opts = {
+        'ignoreconfig': True, 'quiet': True, 'no_warnings': True, 
+        'download_archive': ARCHIVE_FILE, 'progress_hooks': [progress_hook],
+        'nocheckcertificate': True
+    }
+    if os.path.exists(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 0:
+        opts['cookiefile'] = COOKIES_FILE
+    if os.path.exists(NODE_PATH):
+        opts['javascript_interpreter'] = NODE_PATH
+    return opts
+
+def get_browser_cookie_path(browser_name):
+    """Localiza o caminho do banco de dados de cookies para diferentes navegadores e perfis."""
+    appdata = os.getenv('LOCALAPPDATA')
+    paths = {
+        'chrome': os.path.join(appdata, 'Google/Chrome/User Data'),
+        'brave': os.path.join(appdata, 'BraveSoftware/Brave-Browser/User Data'),
+        'edge': os.path.join(appdata, 'Microsoft/Edge/User Data')
+    }
+    
+    if browser_name not in paths: return None
+    
+    base_path = paths[browser_name]
+    # Tenta perfis comuns: Default, Profile 1, Profile 2...
+    profiles = ['Default', 'Profile 1', 'Profile 2', 'Profile 3']
+    for profile in profiles:
+        cookie_path = os.path.join(base_path, profile, 'Network', 'Cookies')
+        if os.path.exists(cookie_path):
+            return cookie_path
+    return None
+
+@app.route('/api/sync-cookies', methods=['POST'])
+def sync_cookies():
+    browsers = ['brave', 'chrome', 'edge']
+    success_browser = None
+    
+    for browser in browsers:
+        try:
+            print(f"[Sync] Sincronização invisível para {browser}...")
+            # Truque: Usamos o comando do sistema para tentar forçar a cópia mesmo se trancado
+            # O yt-dlp tem um parâmetro interno que tenta lidar com isso
+            temp_cookies = os.path.join(os.getcwd(), 'temp_cookies.txt')
+            
+            # Limpa lixo anterior
+            if os.path.exists(temp_cookies): os.remove(temp_cookies)
+            
+            ydl_opts = {
+                'quiet': True, 'no_warnings': True,
+                'cookiesfrombrowser': (browser,),
+                'cookiefile': temp_cookies,
+                'extract_flat': True, 'skip_download': True
+            }
+            
+            # Tenta a extração mágica
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.extract_info("https://www.youtube.com/favicon.ico", download=False)
+            
+            if os.path.exists(temp_cookies) and os.path.getsize(temp_cookies) > 100:
+                if os.path.exists(COOKIES_FILE): os.remove(COOKIES_FILE)
+                os.rename(temp_cookies, COOKIES_FILE)
+                success_browser = browser
+                break
+        except Exception as e:
+            print(f"[Sync] Falha no {browser}: {str(e)}")
+            continue
+
+    if success_browser:
+        return jsonify({'success': True, 'browser': success_browser})
+    
+    return jsonify({
+        'success': False, 
+        'message': 'Não foi possível extrair automaticamente. Por favor, use o método de Arrastar o ficheiro cookies.txt para o quadrado abaixo.'
+    })
+
+@app.route('/api/save-cookies', methods=['POST'])
+def save_cookies():
+    try:
+        content = request.json.get('cookies', '')
+        with open(COOKIES_FILE, 'w', encoding='utf-8') as f: f.write(content)
+        return jsonify({'success': True})
+    except Exception as e: return jsonify({'error': str(e)}), 500
+
+@app.route('/api/info', methods=['POST'])
+def get_info():
+    try:
+        url = request.json.get('url')
+        ydl_opts = {**get_common_opts(), 'extract_flat': True}
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            if 'entries' not in info and ('list=' in url or 'playlist' in url):
+                ydl_opts['extract_flat'] = False
+                info = ydl.extract_info(url, download=False)
+
+            entries = []
+            if 'entries' in info:
+                for entry in info['entries']:
+                    if entry:
+                        thumb = entry.get('thumbnail')
+                        if not thumb and entry.get('thumbnails'): thumb = entry.get('thumbnails')[0].get('url')
+                        entries.append({
+                            'id': entry.get('id'), 'title': entry.get('title') or 'Vídeo',
+                            'channel': entry.get('uploader') or entry.get('channel') or info.get('uploader') or 'Canal',
+                            'url': f"https://www.youtube.com/watch?v={entry.get('id')}", 'thumbnail': thumb
+                        })
+
+            main_thumbnail = info.get('thumbnail')
+            if not main_thumbnail and 'thumbnails' in info and info['thumbnails']: main_thumbnail = info['thumbnails'][0].get('url')
+            if not main_thumbnail and entries: main_thumbnail = entries[0].get('thumbnail')
+
+            return jsonify({
+                'id': info.get('id'), 'title': info.get('title'), 'thumbnail': main_thumbnail,
+                'channel': info.get('uploader') or info.get('channel'), 'description': info.get('description', ''),
+                'url': url, 'is_playlist': 'entries' in info, 'entries': entries, 'current_path': DOWNLOAD_FOLDER
+            })
+    except Exception as e: return jsonify({'error': str(e)}), 400
+
+@app.route('/api/video-details', methods=['POST'])
+def video_details():
+    try:
+        video_id = request.json.get('id')
+        if not video_id:
+            return jsonify({'error': 'ID do vídeo em falta'}), 400
+            
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        # 🔥 IMPORTANTE: Usar get_common_opts() para incluir os cookies!
+        ydl_opts = {**get_common_opts(), 'extract_flat': True}
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            return jsonify({
+                'description': info.get('description', 'Sem descrição disponível.'),
+                'id': video_id
+            })
+    except Exception as e:
+        print(f"[Error] Falha nos detalhes: {str(e)}")
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/download-single', methods=['POST'])
+def download_single():
+    data = request.json
+    url, video_id, format_type, playlist_title = data.get('url'), data.get('id'), data.get('format', 'mp4'), data.get('playlist_title', '')
+    def run_download():
+        try:
+            progress_store[video_id] = {'percent': 0, 'status': 'starting'}
+            subfolder = f"{playlist_title}/" if playlist_title else ""
+            out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"{subfolder}%(playlist_index&{{:02d}} - |)s%(title)s.%(ext)s")
+            ydl_opts = {**get_common_opts(), 'format': 'bestvideo+bestaudio/best' if format_type == 'mp4' else 'bestaudio/best', 'outtmpl': out_tmpl, 'merge_output_format': 'mp4' if format_type == 'mp4' else None, 'nopart': True, 'restrictfilenames': True}
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl: ydl.download([url])
+        except: progress_store[video_id] = {'percent': 0, 'status': 'error'}
+    threading.Thread(target=run_download).start()
+    return jsonify({'success': True})
+
+@app.route('/api/progress-all', methods=['POST'])
+def get_all_progress():
+    ids = request.json.get('ids', []); results = {}
+    for vid in ids: results[vid] = progress_store.get(vid, {'percent': 0, 'status': 'waiting'})
+    return jsonify(results)
+
+@app.route('/api/history', methods=['GET'])
+def get_history():
+    files = []
+    if os.path.exists(DOWNLOAD_FOLDER):
+        for root, dirs, filenames in os.walk(DOWNLOAD_FOLDER):
+            for f in filenames:
+                if f == "downloaded_history.txt": continue
+                path = os.path.join(root, f); stats = os.stat(path)
+                files.append({'name': f, 'size': f"{stats.st_size / (1024*1024):.1f} MB", 'date': time.strftime('%d/%m/%Y', time.localtime(stats.st_mtime))})
+    return jsonify({'files': sorted(files, key=lambda x: x['date'], reverse=True), 'current_path': DOWNLOAD_FOLDER})
+
+@app.route('/api/select-folder', methods=['POST'])
+def select_folder():
+    global DOWNLOAD_FOLDER
+    try:
+        root = tk.Tk(); root.withdraw(); root.attributes('-topmost', True)
+        selected_path = filedialog.askdirectory(initialdir=DOWNLOAD_FOLDER); root.destroy()
+        if selected_path: DOWNLOAD_FOLDER = os.path.abspath(selected_path); return jsonify({'success': True, 'path': DOWNLOAD_FOLDER})
+        return jsonify({'success': False})
+    except Exception as e: return jsonify({'error': str(e)}), 500
+
+@app.route('/api/open-folder', methods=['POST'])
+def open_folder(): subprocess.Popen(f'explorer "{DOWNLOAD_FOLDER}"'); return jsonify({'success': True})
+
+@app.route('/api/delete', methods=['POST'])
+def delete_file():
+    try:
+        filename = request.json.get('name')
+        for root, dirs, filenames in os.walk(DOWNLOAD_FOLDER):
+            if filename in filenames: os.remove(os.path.join(root, filename)); return jsonify({'success': True})
+        return jsonify({'error': 'Não encontrado'}), 404
+    except Exception as e: return jsonify({'error': str(e)}), 500
+
+@app.route('/')
+def index(): return app.send_static_file('index.html')
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)
