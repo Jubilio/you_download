@@ -71,14 +71,17 @@ const placeholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg
 const Notify = {
     show: (title, message, type = 'info') => {
         const id = Date.now();
-        const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
+        const icons = { success: 'fa-circle-check', error: 'fa-circle-xmark', info: 'fa-circle-info' };
         
         const html = `
             <div class="notification ${type}" id="notif-${id}">
-                <i class="fa-solid ${icon}"></i>
+                <i class="fa-solid ${icons[type]}"></i>
                 <div class="notification-content">
                     <div class="notification-title">${title}</div>
                     <div class="notification-message">${message}</div>
+                </div>
+                <div class="notif-progress">
+                    <div class="notif-progress-inner"></div>
                 </div>
             </div>
         `;
@@ -86,6 +89,8 @@ const Notify = {
         notificationContainer.insertAdjacentHTML('afterbegin', html);
         const el = document.getElementById(`notif-${id}`);
         setTimeout(() => el.classList.add('show'), 10);
+        
+        // Auto-remove
         setTimeout(() => {
             el.classList.remove('show');
             setTimeout(() => el.remove(), 500);
@@ -93,7 +98,7 @@ const Notify = {
 
         if (type === 'success' && notifySound) {
             notifySound.currentTime = 0;
-            notifySound.play().catch(e => console.log("Áudio bloqueado pelo browser"));
+            notifySound.play().catch(e => console.log("Áudio bloqueado"));
         }
     }
 };

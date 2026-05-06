@@ -66,12 +66,11 @@ def get_common_opts():
     opts = {
         'ignoreconfig': True, 'quiet': True, 'no_warnings': True, 
         'download_archive': ARCHIVE_FILE, 'progress_hooks': [progress_hook],
-        'nocheckcertificate': True
+        'nocheckcertificate': True,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
     if os.path.exists(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 0:
         opts['cookiefile'] = COOKIES_FILE
-    if os.path.exists(NODE_PATH):
-        opts['javascript_interpreter'] = NODE_PATH
     return opts
 
 def get_browser_cookie_path(browser_name):
@@ -223,23 +222,39 @@ def get_info():
 @app.route('/api/video-details', methods=['POST'])
 def video_details():
     try:
-        video_id = request.json.get('id')
+        data = request.get_json(silent=True)
+        video_id = data.get('id') if data else None
+        
         if not video_id:
             return jsonify({'error': 'ID do vídeo em falta'}), 400
             
         url = f"https://www.youtube.com/watch?v={video_id}"
-        # 🔥 IMPORTANTE: Usar get_common_opts() para incluir os cookies!
-        ydl_opts = {**get_common_opts(), 'extract_flat': True}
+        print(f"[Detalhes] Buscando descrição para: {video_id}")
         
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'format': 'best',
+            'ignoreerrors': True,
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+        
+        # Tenta usar cookies se disponíveis
+        cookies = sync_cookies()
+        if cookies: ydl_opts['cookiefile'] = COOKIES_FILE
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
+            if not info:
+                return jsonify({'description': 'Não foi possível carregar os detalhes deste vídeo.', 'id': video_id})
+                
             return jsonify({
                 'description': info.get('description', 'Sem descrição disponível.'),
                 'id': video_id
             })
     except Exception as e:
         print(f"[Error] Falha nos detalhes: {str(e)}")
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'description': f'Erro: {str(e)}', 'id': video_id})
 
 @app.route('/api/download-single', methods=['POST'])
 def download_single():
@@ -250,9 +265,20 @@ def download_single():
             progress_store[video_id] = {'percent': 0, 'status': 'starting'}
             subfolder = f"{playlist_title}/" if playlist_title else ""
             out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"{subfolder}%(playlist_index&{{:02d}} - |)s%(title)s.%(ext)s")
-            ydl_opts = {**get_common_opts(), 'format': 'bestvideo+bestaudio/best' if format_type == 'mp4' else 'bestaudio/best', 'outtmpl': out_tmpl, 'merge_output_format': 'mp4' if format_type == 'mp4' else None, 'nopart': True, 'restrictfilenames': True}
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl: ydl.download([url])
-        except: progress_store[video_id] = {'percent': 0, 'status': 'error'}
+            ydl_opts = {
+                **get_common_opts(), 
+                'format': 'bestvideo+bestaudio/best' if format_type == 'mp4' else 'bestaudio/best', 
+                'outtmpl': out_tmpl, 
+                'merge_output_format': 'mp4' if format_type == 'mp4' else None, 
+                'nopart': True, 
+                'restrictfilenames': True
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+        except Exception as e:
+            print(f"[Erro Download] {str(e)}")
+            progress_store[video_id] = {'percent': 0, 'status': 'error', 'msg': str(e)}
+    
     threading.Thread(target=run_download).start()
     return jsonify({'success': True})
 
@@ -307,13 +333,13 @@ def download_section():
                 **get_common_opts(), 
                 'format': 'bestvideo+bestaudio/best' if format_type == 'mp4' else 'bestaudio/best', 
                 'outtmpl': out_tmpl, 
-                'download_sections': [f"*{start_str}-{end_str}"],
                 'force_keyframes_at_cuts': True,
                 'nopart': True,
-                # Aumentamos os fragmentos simultâneos para ser muito mais rápido
-                'concurrent_fragment_downloads': 10,
-                # Evita baixar o vídeo todo se houver erro de seek
-                'ignoreerrors': True,
+                'external_downloader': 'ffmpeg',
+                'external_downloader_args': {
+                    'ffmpeg_i': ['-ss', start_str, '-to', end_str]
+                },
+                'hls_use_mpegts': True, # Ajuda na estabilidade de streams longos
             }
             
             # Sobrescreve o progress_hook para usar o section_id
