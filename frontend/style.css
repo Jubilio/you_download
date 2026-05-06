@@ -293,3 +293,14 @@ footer a:hover { text-decoration: underline; }
 .btn-cancel { background: rgba(255,255,255,0.05); color: white; }
 .btn-confirm-action { background: var(--primary); color: white; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3); }
 .btn-confirm-action:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(99, 102, 241, 0.5); }
+
+.item-progress-fill.processing {
+    background: linear-gradient(90deg, var(--primary), #a855f7, var(--primary));
+    background-size: 200% 100%;
+    animation: processing-glow 2s linear infinite;
+}
+
+@keyframes processing-glow {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+}

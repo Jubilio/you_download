@@ -64,6 +64,48 @@ const downloadPlayerBtn = document.getElementById('download-player-btn');
 let activeTasks = new Set();
 let currentPlaylistTitle = "";
 
+// Inicializa Socket.IO
+const socket = io("http://" + window.location.hostname + ":5000");
+
+socket.on('progress', (progress) => {
+    const { id, percent, status } = progress;
+    const item = document.querySelector(`.queue-item[data-id="${id}"]`);
+    if (!item) return;
+
+    const fill = item.querySelector('.item-progress-fill');
+    const badge = item.querySelector('.status-badge');
+    
+    if (status === 'downloading') { 
+        fill.style.width = `${percent}%`; 
+        badge.innerText = `${percent}%`; 
+    } else if (status === 'processing') {
+        badge.innerText = "Processando...";
+        fill.style.width = "50%";
+        fill.classList.add('processing');
+    } else if (progress.status === 'starting') {
+        badge.innerText = "Iniciando...";
+    } else if (status === 'finished') { 
+        fill.style.width = "100%"; 
+        fill.classList.remove('processing');
+        fill.classList.add('finished'); 
+        badge.innerText = "Concluído"; 
+        item.dataset.status = "finished"; 
+        item.querySelector('.control-btn i').className = "fa-solid fa-check"; 
+        activeTasks.delete(id); 
+        Notify.show("Concluído", "Download finalizado!", "success"); 
+        sendBrowserNotification("Download Concluído", "Ficheiro salvo."); 
+        loadHistory(); 
+    } else if (status === 'error') {
+        badge.innerText = "Erro!";
+        item.dataset.status = "error";
+        activeTasks.delete(id);
+    } else if (status === 'cancelled') {
+        badge.innerText = "Cancelado";
+        item.dataset.status = "cancelled";
+        activeTasks.delete(id);
+    }
+});
+
 const placeholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='45' viewBox='0 0 80 45'%3E%3Crect width='100%25' height='100%25' fill='%231e293b'/%3E%3C/svg%3E";
 
 // --- SISTEMA DE NOTIFICAÇÕES ---
@@ -479,26 +521,7 @@ async function startDownloadItem(id) {
     } catch (err) { item.dataset.status = 'error'; item.querySelector('.status-badge').innerText = "Erro!"; activeTasks.delete(id); }
 }
 
-async function updateAllProgress() {
-    if (activeTasks.size === 0) return;
-    try {
-        const response = await fetch('/api/progress-all', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: Array.from(activeTasks) }) });
-        const data = await response.json();
-        for (const [id, progress] of Object.entries(data)) {
-            const item = document.querySelector(`.queue-item[data-id="${id}"]`);
-            if (!item) continue;
-            const fill = item.querySelector('.item-progress-fill');
-            const badge = item.querySelector('.status-badge');
-            if (progress.status === 'downloading') { fill.style.width = `${progress.percent}%`; badge.innerText = `${progress.percent}%`; }
-            else if (progress.status === 'finished') { 
-                fill.style.width = "100%"; fill.classList.add('finished'); badge.innerText = "Concluído"; 
-                item.dataset.status = "finished"; item.querySelector('.control-btn i').className = "fa-solid fa-check"; 
-                activeTasks.delete(id); Notify.show("Concluído", "Download finalizado!", "success"); 
-                sendBrowserNotification("Download Concluído", "Ficheiro salvo."); loadHistory(); 
-            }
-        }
-    } catch (err) { console.error(err); }
-}
+// Polling removido em favor do Socket.IO
 
 function extractResources(text, container, section) {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -656,6 +679,7 @@ function formatTime(seconds) {
 
 async function downloadChapter(url, id, start, end, title) {
     try {
+        console.log(`[Corte] Iniciando: ${title} (${start}s - ${end}s)`);
         const res = await fetch('/api/download-section', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -664,10 +688,15 @@ async function downloadChapter(url, id, start, end, title) {
         const data = await res.json();
         if (data.success) {
             Notify.show("Corte Iniciado", `A baixar: ${title}`, "info");
-            addClipToQueue({ taskId: data.task_id, title: title });
-            activeTasks.add(data.task_id);
+            addClipToQueue({ taskId: data.taskId, title: title });
+            activeTasks.add(data.taskId);
+        } else {
+            Notify.show("Erro no Recorte", data.message || "Erro desconhecido", "error");
         }
-    } catch (err) { Notify.show("Erro ao Cortar", err.message, "error"); }
+    } catch (err) { 
+        console.error("[Erro Corte]", err);
+        Notify.show("Erro ao Cortar", err.message, "error"); 
+    }
 }
 
 document.getElementById('open-folder-btn').onclick = () => fetch('/api/open-folder', {method: 'POST'});

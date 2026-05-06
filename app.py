@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit
 import yt_dlp
 import os
 import threading
@@ -22,6 +23,7 @@ def get_static_path():
 
 app = Flask(__name__, static_folder=get_static_path(), static_url_path='')
 CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 DOWNLOAD_FOLDER = os.path.join(os.path.expanduser("~"), "Downloads")
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
@@ -53,28 +55,30 @@ def progress_hook(d):
     video_id = d.get('info_dict', {}).get('id')
     if not video_id: return
     
-    # Verifica se foi cancelado
     if video_id in cancelled_tasks:
-        raise DownloadCancelled("Download interrompido pelo utilizador")
+        raise DownloadCancelled("Interrompido")
 
     if d['status'] == 'downloading':
         downloaded = d.get('downloaded_bytes', 0)
         total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
         percent = (downloaded / total * 100) if total > 0 else 0
-        progress_store[video_id] = {
+        
+        socketio.emit('progress', {
+            'id': video_id,
             'percent': round(percent, 1),
             'speed': clean_ansi(d.get('_speed_str', '0B/s')),
             'eta': clean_ansi(d.get('_eta_str', '00:00')),
             'status': 'downloading'
-        }
+        })
     elif d['status'] == 'finished':
-        progress_store[video_id] = {'percent': 100, 'status': 'finished'}
+        socketio.emit('progress', {'id': video_id, 'percent': 100, 'status': 'finished'})
 
 def get_common_opts():
     opts = {
         'ignoreconfig': True, 'quiet': True, 'no_warnings': True, 
         'download_archive': ARCHIVE_FILE, 'progress_hooks': [progress_hook],
         'nocheckcertificate': True,
+        'noplaylist': True, # 🔥 FUNDAMENTAL: Evita entrar em modo playlist
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
     if os.path.exists(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 0:
@@ -101,9 +105,16 @@ def get_browser_cookie_path(browser_name):
             return cookie_path
     return None
 
+LAST_SYNC_TIME = 0
 @app.route('/api/sync-cookies', methods=['POST'])
 def sync_cookies():
-    """Sincroniza cookies usando browser-cookie3 para maior compatibilidade."""
+    """Sincroniza cookies com cache para evitar múltiplas tentativas falhadas."""
+    global LAST_SYNC_TIME
+    now = time.time()
+    if now - LAST_SYNC_TIME < 300: # Cache de 5 minutos
+        return os.path.exists(COOKIES_FILE)
+    
+    LAST_SYNC_TIME = now
     success_browser = None
     
     # Lista de funções de extração do browser-cookie3
@@ -220,7 +231,7 @@ def get_info():
             return jsonify({
                 'id': info.get('id'), 'title': info.get('title'), 'thumbnail': main_thumbnail,
                 'channel': info.get('uploader') or info.get('channel'), 'description': info.get('description', ''),
-                'url': url, 'is_playlist': 'entries' in info, 'entries': entries, 'current_path': DOWNLOAD_FOLDER,
+                'url': url, 'is_playlist': False, 'entries': entries, 'current_path': DOWNLOAD_FOLDER,
                 'chapters': info.get('chapters', [])
             })
     except Exception as e: 
@@ -270,25 +281,26 @@ def download_single():
     url, video_id, format_type, playlist_title = data.get('url'), data.get('id'), data.get('format', 'mp4'), data.get('playlist_title', '')
     def run_download():
         try:
-            progress_store[video_id] = {'percent': 0, 'status': 'starting'}
+            socketio.emit('progress', {'id': video_id, 'percent': 0, 'status': 'starting'})
             subfolder = f"{playlist_title}/" if playlist_title else ""
             out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"{subfolder}%(playlist_index&{{:02d}} - |)s%(title)s.%(ext)s")
+            
             ydl_opts = {
                 **get_common_opts(), 
                 'format': 'bestvideo+bestaudio/best' if format_type == 'mp4' else 'bestaudio/best', 
                 'outtmpl': out_tmpl, 
                 'merge_output_format': 'mp4' if format_type == 'mp4' else None, 
                 'nopart': True, 
-                'restrictfilenames': True
+                'restrictfilenames': True,
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
+            socketio.emit('progress', {'id': video_id, 'percent': 100, 'status': 'finished'})
         except DownloadCancelled:
-            print(f"[Cancelado] Download de {video_id} interrompido.")
-            progress_store[video_id] = {'percent': 0, 'status': 'cancelled'}
+            socketio.emit('progress', {'id': video_id, 'percent': 0, 'status': 'cancelled'})
         except Exception as e:
             print(f"[Erro Download] {str(e)}")
-            progress_store[video_id] = {'percent': 0, 'status': 'error', 'msg': str(e)}
+            socketio.emit('progress', {'id': video_id, 'percent': 0, 'status': 'error'})
         finally:
             if video_id in cancelled_tasks: cancelled_tasks.remove(video_id)
     
@@ -336,7 +348,7 @@ def download_section():
     
     def run_download():
         try:
-            progress_store[section_id] = {'percent': 0, 'status': 'starting'}
+            socketio.emit('progress', {'id': section_id, 'percent': 0, 'status': 'starting'})
             out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"%(title)s - {title}.%(ext)s")
             
             # Formata a seção para o yt-dlp
@@ -359,35 +371,33 @@ def download_section():
                 'external_downloader_args': {
                     'ffmpeg_i': ['-ss', start_str, '-to', end_str]
                 },
-                'hls_use_mpegts': True,
             }
             
             def section_hook(d):
-                if section_id in cancelled_tasks:
-                    raise DownloadCancelled("Recorte cancelado")
-                    
+                if section_id in cancelled_tasks: raise DownloadCancelled("Recorte cancelado")
                 if d['status'] == 'downloading':
                     downloaded = d.get('downloaded_bytes', 0)
                     total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
                     percent = (downloaded / total * 100) if total > 0 else 0
-                    progress_store[section_id] = {'percent': round(percent, 1), 'status': 'downloading'}
+                    socketio.emit('progress', {'id': section_id, 'percent': round(percent, 1), 'status': 'downloading'})
                 elif d['status'] == 'finished':
-                    progress_store[section_id] = {'percent': 100, 'status': 'finished'}
+                    socketio.emit('progress', {'id': section_id, 'percent': 100, 'status': 'finished'})
             
             ydl_opts['progress_hooks'] = [section_hook]
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
+            socketio.emit('progress', {'id': section_id, 'percent': 100, 'status': 'finished'})
         except DownloadCancelled:
-            print(f"[Cancelado] Recorte {section_id} interrompido.")
-            progress_store[section_id] = {'percent': 0, 'status': 'cancelled'}
+            socketio.emit('progress', {'id': section_id, 'percent': 0, 'status': 'cancelled'})
         except Exception as e: 
             print(f"[Erro Recorte] {str(e)}")
-            progress_store[section_id] = {'percent': 0, 'status': 'error', 'msg': str(e)}
+            socketio.emit('progress', {'id': section_id, 'percent': 0, 'status': 'error'})
         finally:
             if section_id in cancelled_tasks: cancelled_tasks.remove(section_id)
             
     threading.Thread(target=run_download).start()
-    return jsonify({'success': True, 'task_id': section_id})
+    print(f"[Sistema] Tarefa de recorte iniciada: {section_id}")
+    return jsonify({'success': True, 'taskId': section_id})
 
 @app.route('/api/progress-all', methods=['POST'])
 def get_all_progress():
@@ -468,4 +478,4 @@ if __name__ == '__main__':
             webbrowser.open("http://127.0.0.1:5000/installer")
         Timer(2.5, open_browser).start()
         
-    app.run(debug=not is_frozen, host=host_addr, port=5000)
+    socketio.run(app, debug=not is_frozen, host=host_addr, port=5000)
