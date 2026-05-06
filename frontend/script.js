@@ -211,7 +211,7 @@ async function fetchInfo() {
         videoTitle.innerText = data.title;
         videoThumbnail.src = data.thumbnail || "";
         videoChannel.innerText = data.channel;
-        videoDescription.innerText = data.description;
+        videoDescription.innerHTML = linkify(data.description);
         currentPlaylistTitle = data.is_playlist ? data.title : "";
         currentPathDisplay.innerText = data.current_path;
         
@@ -248,6 +248,31 @@ async function fetchInfo() {
         updateQueueCount();
         selectAllCheckbox.checked = true;
     } catch (err) { loader.classList.add('hidden'); Notify.show("Erro de Análise", err.message, "error"); }
+}
+
+function addClipToQueue(clip) {
+    const item = document.createElement('div');
+    item.className = 'queue-item clip-task';
+    item.dataset.id = clip.taskId;
+    item.dataset.status = 'downloading';
+    item.innerHTML = `
+        <div class="clip-badge"><i class="fa-solid fa-scissors"></i> Recorte</div>
+        <div class="queue-content">
+            <div class="queue-item-header">
+                <div class="queue-item-info">
+                    <div class="queue-item-title">${clip.title}</div>
+                    <div class="queue-item-meta">
+                        <span class="status-badge">Iniciando...</span>
+                    </div>
+                </div>
+                <div class="queue-controls">
+                    <button class="control-btn btn-danger" onclick="removeTask('${clip.taskId}')"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+            <div class="item-progress-bar"><div class="item-progress-fill"></div></div>
+        </div>`;
+    downloadQueue.prepend(item);
+    updateQueueCount();
 }
 
 function addVideoToQueue(video) {
@@ -292,7 +317,7 @@ async function toggleItemDetails(id) {
         try {
             const res = await fetch('/api/video-details', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
             const data = await res.json();
-            panel.querySelector('.item-desc-text').innerText = data.description;
+            panel.querySelector('.item-desc-text').innerHTML = linkify(data.description);
             extractResources(data.description, panel.querySelector('.item-resources'), null);
             panel.dataset.loaded = 'true';
         } catch (err) { panel.querySelector('.item-desc-text').innerText = "Erro ao carregar."; }
@@ -405,6 +430,13 @@ async function deleteHistoryFile(name) {
 }
 
 function sendBrowserNotification(title, body) { if (Notification.permission === 'granted') new Notification(title, { body }); }
+
+function linkify(text) {
+    if (!text) return "";
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.replace(urlRegex, (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="desc-link">${url}</a>`);
+}
+
 function updateQueueCount() { queueCount.innerText = `${document.querySelectorAll('.queue-item').length} itens`; }
 
 function formatTime(seconds) {
@@ -424,7 +456,7 @@ async function downloadChapter(url, id, start, end, title) {
         const data = await res.json();
         if (data.success) {
             Notify.show("Corte Iniciado", `A baixar: ${title}`, "info");
-            // Adiciona uma task fantasma para acompanhar o progresso (opcional, ou apenas confia no backend)
+            addClipToQueue({ taskId: data.task_id, title: title });
             activeTasks.add(data.task_id);
         }
     } catch (err) { Notify.show("Erro ao Cortar", err.message, "error"); }

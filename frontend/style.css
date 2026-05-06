@@ -86,6 +86,8 @@ header { margin-bottom: 30px; display: flex; justify-content: space-between; ali
 .description-container { margin-top: 20px; }
 .btn-text-only { background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 5px; }
 #video-description { margin-top: 15px; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 10px; font-family: inherit; font-size: 0.85rem; white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto; color: var(--text-dim); line-height: 1.6; }
+.desc-link { color: var(--primary); text-decoration: none; font-weight: 600; transition: 0.3s; }
+.desc-link:hover { text-decoration: underline; color: var(--primary-hover); }
 
 /* Fila de Downloads */
 .queue-section { margin-top: 20px; }
@@ -126,6 +128,10 @@ header { margin-bottom: 30px; display: flex; justify-content: space-between; ali
 .item-progress-fill { width: 0%; height: 100%; background: var(--primary); transition: width 0.4s ease; }
 .item-progress-fill.finished { background: var(--success); }
 .item-progress-fill.error { background: var(--danger); }
+
+/* Clip Task Styling */
+.clip-task { border-left: 4px solid var(--primary); background: rgba(99, 102, 241, 0.08); }
+.clip-badge { background: var(--primary); color: white; padding: 4px 10px; border-radius: 8px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; writing-mode: vertical-lr; transform: rotate(180deg); display: flex; align-items: center; justify-content: center; gap: 5px; }
 
 /* Sidebar */
 .side-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }

@@ -208,6 +208,7 @@ def download_single():
         except: progress_store[video_id] = {'percent': 0, 'status': 'error'}
     threading.Thread(target=run_download).start()
     return jsonify({'success': True})
+
 @app.route('/api/download-section', methods=['POST'])
 def download_section():
     data = request.json

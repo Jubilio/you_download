@@ -53,7 +53,11 @@ source .env/Scripts/activate
 # 2. Instalar dependências
 pip install -r requirements.txt
 
-# 3. Rodar aplicação
+# 3. Instalar FFmpeg (Obrigatório para Recortes/Clipping)
+# Windows: winget install ffmpeg
+# Ou baixe em: https://ffmpeg.org/download.html
+
+# 4. Rodar aplicação
 python app.py
 ```
 
