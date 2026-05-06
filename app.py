@@ -80,27 +80,49 @@ def clean_ansi(text):
     if not text: return ""
     return re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', text)
 
+class YDLProgressLogger:
+    def __init__(self, task_id):
+        self.task_id = task_id
+
+    def debug(self, msg):
+        # O FFmpeg envia o progresso através do log de debug/info
+        if '[download]' in msg and '%' in msg:
+            try:
+                # Tenta extrair a percentagem do log: "[download]  10.5% of ..."
+                parts = msg.split()
+                for p in parts:
+                    if '%' in p:
+                        percent = float(p.replace('%', ''))
+                        socketio.emit('progress', {'id': self.task_id, 'percent': percent, 'status': 'downloading'})
+                        break
+            except: pass
+        print(f"DEBUG [{self.task_id}]: {msg}")
+
+    def info(self, msg): self.debug(msg)
+    def warning(self, msg): print(f"WARN [{self.task_id}]: {msg}")
+    def error(self, msg): print(f"ERROR [{self.task_id}]: {msg}")
+
 def make_progress_hook(task_id):
     def hook(d):
         if task_id in cancelled_tasks:
             raise DownloadCancelled("Interrompido")
 
-        if d['status'] == 'downloading':
+        status = d.get('status')
+        print(f">>> [HOOK {task_id}] Status: {status}")
+
+        if status == 'downloading':
             downloaded = d.get('downloaded_bytes', 0)
             total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
             
-            # Se não houver total, tenta usar fragmentos se for HLS/Dash
             if not total and 'fragment_count' in d:
                 total = d.get('fragment_count', 0)
                 downloaded = d.get('fragment_index', 0)
 
             percent = (downloaded / total * 100) if total > 0 else 0
             
-            # Log forçado no console para debugar
             speed = clean_ansi(d.get('_speed_str', 'N/A'))
             eta = clean_ansi(d.get('_eta_str', 'N/A'))
-            print(f">>> [PROGRESO {task_id}] {percent:.1f}% | {speed} | ETA: {eta}")
-
+            
             socketio.emit('progress', {
                 'id': task_id,
                 'percent': round(percent, 1),
@@ -108,8 +130,7 @@ def make_progress_hook(task_id):
                 'eta': eta,
                 'status': 'downloading'
             })
-        elif d['status'] == 'finished':
-            print(f">>> [FINALIZADO {task_id}]")
+        elif status == 'finished':
             socketio.emit('progress', {'id': task_id, 'percent': 100, 'status': 'processing'})
     return hook
 
@@ -354,7 +375,8 @@ def download_single():
                 'merge_output_format': 'mp4' if format_type == 'mp4' else None, 
                 'nopart': True, 
                 'restrictfilenames': True,
-                'progress_hooks': [make_progress_hook(video_id)]
+                'progress_hooks': [make_progress_hook(video_id)],
+                'logger': YDLProgressLogger(video_id)
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
@@ -445,6 +467,7 @@ def download_section():
                 'nopart': True,
                 'download_ranges': yt_dlp.utils.download_range_func(None, [(start, end)]),
                 'progress_hooks': [make_progress_hook(section_id)],
+                'logger': YDLProgressLogger(section_id),
                 'postprocessor_args': {
                     'ffmpeg': ['-err_detect', 'ignore_err', '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5']
                 }
