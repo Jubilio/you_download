@@ -152,17 +152,22 @@ def save_cookies():
 def get_info():
     try:
         url = request.json.get('url')
-        ydl_opts = {**get_common_opts(), 'extract_flat': True}
+        # Adicionamos ignoreerrors para não travar se um vídeo da playlist estiver privado/deletado
+        # E garantimos que ele pegue todos os itens (playlist_items: 'all' é o padrão, mas reforçamos)
+        ydl_opts = {**get_common_opts(), 'extract_flat': True, 'ignoreerrors': True}
+        
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-            if 'entries' not in info and ('list=' in url or 'playlist' in url):
-                ydl_opts['extract_flat'] = False
-                info = ydl.extract_info(url, download=False)
-
+            
+            # Se for uma playlist e falhou no extract_flat, tentamos novamente
+            if not info:
+                return jsonify({'error': 'Não foi possível obter informações do link.'}), 400
+                
+            # Se for playlist, garantir que processamos todas as entradas válidas
             entries = []
             if 'entries' in info:
                 for entry in info['entries']:
-                    if entry:
+                    if entry: # Ignora entradas None (vídeos privados/removidos)
                         thumb = entry.get('thumbnail')
                         if not thumb and entry.get('thumbnails'): thumb = entry.get('thumbnails')[0].get('url')
                         entries.append({
@@ -170,7 +175,7 @@ def get_info():
                             'channel': entry.get('uploader') or entry.get('channel') or info.get('uploader') or 'Canal',
                             'url': f"https://www.youtube.com/watch?v={entry.get('id')}", 'thumbnail': thumb
                         })
-
+            
             main_thumbnail = info.get('thumbnail')
             if not main_thumbnail and 'thumbnails' in info and info['thumbnails']: main_thumbnail = info['thumbnails'][0].get('url')
             if not main_thumbnail and entries: main_thumbnail = entries[0].get('thumbnail')
@@ -181,7 +186,9 @@ def get_info():
                 'url': url, 'is_playlist': 'entries' in info, 'entries': entries, 'current_path': DOWNLOAD_FOLDER,
                 'chapters': info.get('chapters', [])
             })
-    except Exception as e: return jsonify({'error': str(e)}), 400
+    except Exception as e: 
+        print(f"[Error] Info Extraction: {str(e)}")
+        return jsonify({'error': str(e)}), 400
 
 @app.route('/api/video-details', methods=['POST'])
 def video_details():

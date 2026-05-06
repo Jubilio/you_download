@@ -17,6 +17,7 @@ const resourcesSection = document.getElementById('resources-section');
 const resourcesList = document.getElementById('resources-list');
 const videoDescription = document.getElementById('video-description');
 const toggleDescBtn = document.getElementById('toggle-desc');
+const downloadDescBtn = document.getElementById('download-desc-btn');
 const chaptersSection = document.getElementById('chapters-section');
 const chaptersList = document.getElementById('chapters-list');
 
@@ -196,6 +197,23 @@ selectAllCheckbox.addEventListener('change', (e) => {
 toggleDescBtn.addEventListener('click', () => {
     const isHidden = videoDescription.classList.toggle('hidden');
     toggleDescBtn.innerHTML = isHidden ? 'Ver Descrição Completa <i class="fa-solid fa-chevron-down"></i>' : 'Ocultar Descrição <i class="fa-solid fa-chevron-up"></i>';
+});
+
+downloadDescBtn.addEventListener('click', () => {
+    const text = videoDescription.innerText;
+    const title = videoTitle.innerText || "descricao";
+    if (!text) return Notify.show("Aviso", "Analise um vídeo primeiro.", "error");
+    
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title.replace(/[\\/:*?"<>|]/g, "")}_descricao.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    Notify.show("Sucesso", "Descrição exportada!", "success");
 });
 
 async function fetchInfo() {
