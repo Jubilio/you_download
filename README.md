@@ -1,4 +1,77 @@
 # 📥 YouDown - Media Dashboard Premium
+by **[NexoVibe](https://nexovibe.netlify.app/)**
+
+Um ecossistema de elite para gestão e extração de média do YouTube. Projetado com estética **Glassmorphism 2.0**, o YouDown transforma vídeos longos em bibliotecas organizadas através de ferramentas de precisão cirúrgica.
+
+---
+
+## ✨ Características de Elite
+
+- ✂️ **Smart Clipping & TOC**: Detete capítulos automaticamente ou cole um índice completo para recortar vídeos longos (ex: aulas de 10h+) em minutos.
+- 🚀 **Surgical Cut Engine**: Utiliza FFmpeg para extrair apenas os fragmentos necessários, sem baixar o vídeo original completo.
+- 🎨 **Interface NexoVibe**: Design futurista com modo escuro, desfoques dinâmicos e micro-animações premium.
+- 🍪 **Smart Cookie Sync**: Sincronização segura com navegadores locais para acesso a conteúdos restritos.
+- 🔗 **Auto-Resource Extraction**: Identifica links de Drive, Mega e PDF nas descrições e organiza-os para acesso rápido.
+- 🛠️ **Setup Wizard**: Interface de instalação dedicada (`/installer`) para configuração automática de requisitos.
+
+---
+
+## 🚀 Como Começar
+
+### 1. Requisitos do Core
+- **Python 3.9+**
+- **FFmpeg** (Obrigatório para a função de recortes).
+    - *Dica: Use a nossa interface de instalação para configurar o FFmpeg automaticamente.*
+
+### 2. Execução via Código
+```bash
+# Instalar dependências
+pip install -r requirements.txt
+
+# Iniciar servidor
+python app.py
+```
+Acesse: `http://127.0.0.1:5000/installer`
+
+### 3. Gerar o Executável (.exe)
+Para distribuir o YouDown como um app standalone:
+1. Garanta que o ícone `youdown_logo_icon.ico` está na raiz.
+2. Execute o script de build:
+   ```bash
+   python build.py
+   ```
+3. O ficheiro final estará em `dist/YouDown_NexoVibe.exe`.
+
+---
+
+## 🎯 Guia de Clipping (Recortes)
+
+Para extrair aulas específicas de um vídeo longo:
+1. Analise o vídeo no dashboard.
+2. No painel **TOC (Table of Contents)**, cole a lista de tempos (ex: `0:00 Aula 1`).
+3. Clique em **Processar Índice**. O sistema irá fatiar o vídeo e baixar cada aula individualmente com o nome correto.
+
+---
+
+## 📋 Estrutura do Projeto
+
+```text
+you_down/
+├── app.py                 # Backend Core & API
+├── build.py               # Script de Compilação Standalone
+├── installer.html         # Interface de Onboarding Futurista
+├── frontend/              # Assets da Dashboard
+│   ├── index.html         # UI Principal
+│   ├── style.css          # Design System
+│   └── script.js          # Engine Reativa
+├── downloads/             # Saída de Média (Ignorado pelo Git)
+└── requirements.txt       # Dependências Python
+```
+
+---
+
+**Última atualização:** Maio 2026  
+**Desenvolvido com ❤️ por [NexoVibe](https://nexovibe.netlify.app/)**
 
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/Flask-3.0-green.svg)](https://flask.palletsprojects.com/)

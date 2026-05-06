@@ -389,7 +389,9 @@ if __name__ == '__main__':
         import webbrowser
         from threading import Timer
         def open_browser():
-            webbrowser.open("http://127.0.0.1:5000")
-        Timer(1.5, open_browser).start()
+            # Direciona para o instalador na primeira execução do executável
+            webbrowser.open("http://127.0.0.1:5000/installer")
+        # Aumentamos o tempo para 2.5s para garantir que o Flask já subiu
+        Timer(2.5, open_browser).start()
         
-    app.run(debug=False, port=5000)
+    app.run(debug=False, host='127.0.0.1', port=5000)

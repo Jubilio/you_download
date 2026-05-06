@@ -27,10 +27,11 @@ def build():
         "pyinstaller",
         "--noconfirm",
         "--onefile",
-        "--windowed",
-        "--icon", "youdown_logo_icon.ico", # Certifique-se de converter o PNG para .ico
+        "--console", # Mudamos para console para você ver o erro se ele fechar sozinho
+        "--icon", "youdown_logo_icon.ico",
         "--name", "YouDown_NexoVibe",
         f"--add-data=frontend{separator}frontend",
+        f"--add-data=installer.html{separator}.", # Incluindo o instalador explicitamente
         "--hidden-import=browser_cookie3",
         "--hidden-import=yt_dlp",
         "app.py"
