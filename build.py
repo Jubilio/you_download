@@ -28,6 +28,7 @@ def build():
         "--noconfirm",
         "--onefile",
         "--windowed",
+        "--icon", "youdown_logo_icon.ico", # Certifique-se de converter o PNG para .ico
         "--name", "YouDown_NexoVibe",
         f"--add-data=frontend{separator}frontend",
         "--hidden-import=browser_cookie3",

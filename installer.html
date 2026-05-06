@@ -181,12 +181,24 @@
                         <span style="color: var(--primary)">OK</span>
                     </div>
                     <div class="req-item" id="ffmpeg-req">
-                        <span><i class="fa-solid fa-hourglass-half"></i> FFmpeg Multimedia Engine</span>
-                        <span id="ffmpeg-status" style="color: #f0f">DETECTANDO...</span>
+                        <div style="display: flex; flex-direction: column;">
+                            <span><i class="fa-solid fa-hourglass-half"></i> FFmpeg Multimedia Engine</span>
+                            <small style="font-size: 0.6rem; margin-left: 30px;">Necessário para recortes de precisão.</small>
+                        </div>
+                        <span id="ffmpeg-status" style="color: #f0f">PENDENTE</span>
                     </div>
                 </div>
 
-                <button class="btn-next" onclick="nextStep(2)">Próximo Passo <i class="fa-solid fa-arrow-right"></i></button>
+                <div style="display: flex; gap: 15px; margin-bottom: 30px;">
+                    <button id="btn-auto-install" class="btn-next" style="background: rgba(255,255,255,0.05); border: 1px solid var(--primary); padding: 10px 20px;">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Instalar Automático
+                    </button>
+                    <a href="https://ffmpeg.org/download.html" target="_blank" class="btn-next" style="background: transparent; border: 1px solid var(--border); padding: 10px 20px; text-decoration: none;">
+                        <i class="fa-solid fa-link"></i> Link Manual
+                    </a>
+                </div>
+
+                <button class="btn-next" onclick="nextStep(2)">Continuar Configuração <i class="fa-solid fa-arrow-right"></i></button>
             </div>
 
             <!-- View 2: Installation Animation -->
@@ -224,6 +236,31 @@
     </div>
 
     <script>
+        // Deteção de FFmpeg e Instalação Automática
+        const autoBtn = document.getElementById('btn-auto-install');
+        autoBtn.addEventListener('click', async () => {
+            autoBtn.disabled = true;
+            autoBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> A instalar...';
+            
+            try {
+                const res = await fetch('/api/install-ffmpeg', { method: 'POST' });
+                const data = await res.json();
+                
+                if(data.success) {
+                    document.getElementById('ffmpeg-req').classList.add('checked');
+                    document.getElementById('ffmpeg-status').innerText = 'READY';
+                    document.getElementById('ffmpeg-status').style.color = '#00f2ff';
+                    alert(data.message);
+                } else {
+                    alert("A instalação automática falhou. Por favor, use o link manual.");
+                }
+            } catch (e) {
+                alert("Erro de comunicação com o servidor.");
+            }
+            autoBtn.disabled = false;
+            autoBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Instalar Automático';
+        });
+
         function nextStep(step) {
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
             document.querySelectorAll('.step-item').forEach(s => s.classList.remove('active'));

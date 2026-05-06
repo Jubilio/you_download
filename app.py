@@ -234,6 +234,22 @@ def download_single():
     threading.Thread(target=run_download).start()
     return jsonify({'success': True})
 
+@app.route('/api/install-ffmpeg', methods=['POST'])
+def install_ffmpeg():
+    """Tenta instalar o FFmpeg automaticamente usando o Winget."""
+    try:
+        # Usa o comando nativo do Windows (Winget) para instalar o FFmpeg
+        subprocess.run(['winget', 'install', 'ffmpeg', '--source', 'winget', '--accept-package-agreements', '--accept-source-agreements'], check=True)
+        global HAS_FFMPEG
+        HAS_FFMPEG = check_ffmpeg() # Re-verifica
+        return jsonify({'success': True, 'message': 'FFmpeg instalado! Reinicie o aplicativo para garantir que tudo está sincronizado.'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': 'Não foi possível instalar automaticamente. Por favor, use o link manual.'})
+
+@app.route('/installer')
+def installer():
+    return send_file('installer.html')
+
 @app.route('/api/download-section', methods=['POST'])
 def download_section():
     if not HAS_FFMPEG:
@@ -272,17 +288,12 @@ def download_section():
                 'download_sections': [section_str],
                 'force_keyframes_at_cuts': True,
                 'nopart': True,
-                # --- CONFIGURAÇÃO PARA BAIXAR APENAS O TRECHO (FRAGMENTOS) ---
-                # Usamos o ffmpeg como downloader externo para permitir o seek direto no stream
+                # --- SEEK RÁPIDO PARA VÍDEOS LONGOS ---
+                # Usar external_downloader_args para colocar o -ss ANTES do input
                 'external_downloader': 'ffmpeg',
                 'external_downloader_args': {
-                    'ffmpeg': [
-                        '-ss', start_str,
-                        '-to', end_str,
-                        '-loglevel', 'info'
-                    ]
+                    'ffmpeg_i': ['-ss', start_str, '-to', end_str]
                 },
-                # Garante que ele não baixe o vídeo todo para depois cortar
                 'hls_use_mpegts': True, 
             }
             
@@ -373,4 +384,12 @@ def update_engine():
 def index(): return app.send_static_file('index.html')
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Abrir o browser automaticamente apenas se estiver no modo executável
+    if getattr(sys, 'frozen', False):
+        import webbrowser
+        from threading import Timer
+        def open_browser():
+            webbrowser.open("http://127.0.0.1:5000")
+        Timer(1.5, open_browser).start()
+        
+    app.run(debug=False, port=5000)
