@@ -1,9 +1,11 @@
 :root {
     --primary: #6366f1;
     --primary-hover: #4f46e5;
-    --success: #10b981;
+    --success: #22c55e;
     --danger: #ef4444;
     --bg-dark: #0f172a;
+    --card-bg: #1e293b;
+    --accent: #6366f1;
     --glass-bg: rgba(255, 255, 255, 0.05);
     --glass-border: rgba(255, 255, 255, 0.1);
     --text-main: #f8fafc;
@@ -138,41 +140,165 @@ header { margin-bottom: 30px; display: flex; justify-content: space-between; ali
 .channel-name { color: var(--primary); font-weight: 600; }
 
 /* Detalhes Expansíveis do Item */
-.item-details-panel { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.8rem; }
-.item-details-header { display: flex; justify-content: flex-end; margin-bottom: 8px; }
-.item-desc-text { color: var(--text-dim); white-space: pre-wrap; max-height: 150px; overflow-y: auto; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 8px; margin-bottom: 10px; line-height: 1.4; }
-.item-resources { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+/* --- GRID DE DOWNLOADS ESTILO NETFLIX --- */
+.download-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+    padding: 20px 0;
+}
 
-.btn-info { background: transparent; border: none; color: var(--text-dim); cursor: pointer; transition: 0.3s; }
-.btn-info:hover { color: var(--primary); transform: rotate(15deg); }
-.control-btn { background: rgba(255,255,255,0.05); border: none; width: 32px; height: 32px; border-radius: 8px; color: white; cursor: pointer; transition: 0.2s; }
-.control-btn:hover { background: var(--primary); }
-.control-btn.btn-danger:hover { background: var(--danger); }
+.card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    position: relative;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
 
-/* Barra de Progresso do Item */
-.item-progress-bar { width: 100%; height: 6px; background: rgba(0,0,0,0.3); border-radius: 10px; overflow: hidden; position: relative; }
-.item-progress-fill { width: 0%; height: 100%; background: var(--primary); transition: width 0.4s ease; }
-.item-progress-fill.finished { background: var(--success); }
-.item-progress-fill.error { background: var(--danger); }
+.card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    border-color: var(--primary);
+}
 
-/* Clip Task Styling */
-.clip-task { border-left: 4px solid var(--primary); background: rgba(99, 102, 241, 0.08); }
-.clip-badge { background: var(--primary); color: white; padding: 4px 10px; border-radius: 8px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; writing-mode: vertical-lr; transform: rotate(180deg); display: flex; align-items: center; justify-content: center; gap: 5px; }
+.card-thumb {
+    width: 100%;
+    aspect-ratio: 16/9;
+    object-fit: cover;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.05);
+    background: #000;
+}
+
+.card-body {
+    padding: 16px;
+}
+
+.card-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.4;
+    height: 2.6rem;
+    color: var(--text-main);
+}
+
+.card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+}
+
+.card-status {
+    color: var(--primary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.card-progress-container {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 15px;
+}
+
+.card-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--primary), #a855f7);
+    transition: width 0.4s ease;
+    border-radius: 10px;
+}
+
+.card-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.btn-icon {
+    background: rgba(255, 255, 255, 0.05);
+    border: none;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.btn-icon:hover {
+    background: var(--primary);
+    transform: scale(1.1);
+}
+
+.btn-icon.btn-danger:hover {
+    background: var(--danger);
+}
+
+/* Badge de Recorte */
+.clip-badge-overlay {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: var(--primary);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    z-index: 2;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Animação para Processing */
+.card-progress-fill.processing {
+    background: linear-gradient(90deg, var(--primary), #a855f7, var(--primary));
+    background-size: 200% 100%;
+    animation: processing-glow 2s linear infinite;
+}
+
+@keyframes processing-glow {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+}
 
 /* Sidebar */
 .side-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .side-actions { display: flex; gap: 10px; }
-.side-actions button { background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 1.1rem; }
+.side-actions button { background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 1.1rem; transition: 0.3s; }
+.side-actions button:hover { color: var(--primary); transform: scale(1.1); }
+.btn-danger-icon:hover { color: var(--danger) !important; }
 .path-config { background: rgba(0,0,0,0.2); padding: 12px; border-radius: 12px; margin-bottom: 20px; font-size: 0.8rem; }
 .path-display { display: flex; justify-content: space-between; align-items: center; margin-top: 5px; }
 #current-path { color: var(--success); font-family: monospace; overflow: hidden; text-overflow: ellipsis; }
 #change-folder-btn { background: transparent; border: none; color: var(--primary); cursor: pointer; }
 
 .history-list { display: flex; flex-direction: column; gap: 10px; max-height: 500px; overflow-y: auto; }
-.history-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 12px; transition: 0.3s; border: 1px solid transparent; }
+.history-item { display: flex; align-items: center; gap: 15px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 12px; transition: 0.3s; border: 1px solid transparent; }
 .history-item:hover { background: rgba(255,255,255,0.06); border-color: var(--glass-border); }
-.file-name { font-size: 0.8rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-main); }
+.history-thumb { width: 60px; height: 34px; object-fit: cover; border-radius: 6px; background: #000; flex-shrink: 0; }
+.history-info { flex: 1; min-width: 0; }
+.file-name { font-size: 0.85rem; font-weight: 600; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 2px; }
+.file-date { font-size: 0.7rem; color: var(--text-dim); }
 .history-actions { display: flex; gap: 8px; align-items: center; }
+.empty-history { text-align: center; padding: 40px 20px; color: var(--text-dim); }
+.empty-history i { font-size: 2.5rem; margin-bottom: 10px; opacity: 0.3; display: block; }
+.empty-history p { font-size: 0.85rem; }
 .play-btn, .delete-btn { background: rgba(255,255,255,0.05); border: none; color: white; border-radius: 8px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; font-size: 0.8rem; }
 .play-btn { color: var(--success); }
 .play-btn:hover { background: var(--success); color: white; transform: scale(1.1); }
@@ -293,14 +419,3 @@ footer a:hover { text-decoration: underline; }
 .btn-cancel { background: rgba(255,255,255,0.05); color: white; }
 .btn-confirm-action { background: var(--primary); color: white; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3); }
 .btn-confirm-action:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(99, 102, 241, 0.5); }
-
-.item-progress-fill.processing {
-    background: linear-gradient(90deg, var(--primary), #a855f7, var(--primary));
-    background-size: 200% 100%;
-    animation: processing-glow 2s linear infinite;
-}
-
-@keyframes processing-glow {
-    from { background-position: 200% 0; }
-    to { background-position: -200% 0; }
-}

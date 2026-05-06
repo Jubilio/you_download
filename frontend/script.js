@@ -65,43 +65,40 @@ let activeTasks = new Set();
 let currentPlaylistTitle = "";
 
 // Inicializa Socket.IO
-const socket = io("http://" + window.location.hostname + ":5000");
+// Inicializa Socket.IO (Auto-deteta o host atual)
+const socket = io();
 
 socket.on('progress', (progress) => {
-    const { id, percent, status } = progress;
-    const item = document.querySelector(`.queue-item[data-id="${id}"]`);
-    if (!item) return;
+    const { id, percent, status, speed, eta } = progress;
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
 
-    const fill = item.querySelector('.item-progress-fill');
-    const badge = item.querySelector('.status-badge');
+    const fill = card.querySelector('.card-progress-fill');
+    const badge = card.querySelector('.card-status');
+    const speedEl = card.querySelector('.speed-text');
     
     if (status === 'downloading') { 
         fill.style.width = `${percent}%`; 
         badge.innerText = `${percent}%`; 
+        if (speedEl) speedEl.innerText = speed || '';
     } else if (status === 'processing') {
         badge.innerText = "Processando...";
         fill.style.width = "50%";
         fill.classList.add('processing');
-    } else if (progress.status === 'starting') {
+    } else if (status === 'starting') {
         badge.innerText = "Iniciando...";
     } else if (status === 'finished') { 
         fill.style.width = "100%"; 
         fill.classList.remove('processing');
-        fill.classList.add('finished'); 
         badge.innerText = "Concluído"; 
-        item.dataset.status = "finished"; 
-        item.querySelector('.control-btn i').className = "fa-solid fa-check"; 
+        card.dataset.status = "finished"; 
         activeTasks.delete(id); 
         Notify.show("Concluído", "Download finalizado!", "success"); 
-        sendBrowserNotification("Download Concluído", "Ficheiro salvo."); 
+        sendBrowserNotification("Download Concluído", "Ficheiro salvo no seu computador.");
         loadHistory(); 
     } else if (status === 'error') {
         badge.innerText = "Erro!";
-        item.dataset.status = "error";
-        activeTasks.delete(id);
-    } else if (status === 'cancelled') {
-        badge.innerText = "Cancelado";
-        item.dataset.status = "cancelled";
+        card.dataset.status = "error";
         activeTasks.delete(id);
     }
 });
@@ -210,7 +207,6 @@ const closeHelpFunc = () => {
 
 document.addEventListener('DOMContentLoaded', () => {
     loadHistory();
-    setInterval(updateAllProgress, 1000);
     if (Notification.permission !== 'granted') Notification.requestPermission();
 });
 
@@ -418,66 +414,48 @@ async function fetchInfo() {
 }
 
 function addClipToQueue(clip) {
-    const item = document.createElement('div');
-    item.className = 'queue-item clip-task';
-    item.dataset.id = clip.taskId;
-    item.dataset.status = 'downloading';
-    item.innerHTML = `
-        <div class="clip-badge"><i class="fa-solid fa-scissors"></i> Recorte</div>
-        <div class="queue-content">
-            <div class="queue-item-header">
-                <div class="queue-item-info">
-                    <div class="queue-item-title">${clip.title}</div>
-                    <div class="queue-item-meta">
-                        <span class="status-badge">Iniciando...</span>
-                    </div>
-                </div>
-                <div class="queue-controls">
-                    <button class="control-btn btn-danger" onclick="removeTask('${clip.taskId}')"><i class="fa-solid fa-xmark"></i></button>
-                </div>
+    const html = `
+    <div class="card clip-task" data-id="${clip.taskId}" data-status="downloading">
+        <div class="clip-badge-overlay"><i class="fa-solid fa-scissors"></i></div>
+        <img src="${placeholder}" class="card-thumb">
+        <div class="card-body">
+            <div class="card-title">${clip.title}</div>
+            <div class="card-meta">
+                <span class="card-status">Iniciando...</span>
+                <span class="speed-text"></span>
             </div>
-            <div class="item-progress-bar"><div class="item-progress-fill"></div></div>
-        </div>`;
-    downloadQueue.prepend(item);
+            <div class="card-progress-container">
+                <div class="card-progress-fill"></div>
+            </div>
+            <div class="card-actions">
+                <button class="btn-icon" onclick="removeTask('${clip.taskId}')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+        </div>
+    </div>`;
+    downloadQueue.insertAdjacentHTML('afterbegin', html);
     updateQueueCount();
 }
 
 function addVideoToQueue(video) {
-    const item = document.createElement('div');
-    item.className = 'queue-item';
-    item.dataset.id = video.id;
-    item.dataset.url = video.url;
-    item.dataset.status = 'waiting';
-    item.innerHTML = `
-        <input type="checkbox" class="item-checkbox" checked>
-        <img src="${video.thumbnail || placeholder}" class="queue-item-thumb" onerror="this.src='${placeholder}'">
-        <div class="queue-content">
-            <div class="queue-item-header">
-                <div class="queue-item-info">
-                    <div class="queue-item-title">${video.title}</div>
-                    <div class="queue-item-meta">
-                        <span class="channel-name"><i class="fa-solid fa-user"></i> ${video.channel}</span>
-                        <span class="status-badge">Aguardando</span>
-                        <button class="btn-info" onclick="toggleItemDetails('${video.id}')" title="Ver detalhes"><i class="fa-solid fa-circle-info"></i></button>
-                    </div>
-                </div>
-                <div class="queue-controls">
-                    <button class="control-btn" onclick="startDownloadItem('${video.id}')"><i class="fa-solid fa-play"></i></button>
-                    <button class="control-btn btn-danger" onclick="removeTask('${video.id}')"><i class="fa-solid fa-xmark"></i></button>
-                </div>
+    const html = `
+    <div class="card" data-id="${video.id}" data-url="${video.url}" data-status="waiting">
+        <img src="${video.thumbnail || placeholder}" class="card-thumb" onerror="this.src='${placeholder}'">
+        <div class="card-body">
+            <div class="card-title" title="${video.title}">${video.title}</div>
+            <div class="card-meta">
+                <span class="card-status">Aguardando</span>
+                <span class="speed-text">${video.channel}</span>
             </div>
-            <div class="item-details-panel hidden" id="details-${video.id}">
-                <div class="item-details-header">
-                    <button class="btn-text-only btn-sm" onclick="downloadText('${video.id}', '${video.title.replace(/'/g, "\\'")}')">
-                        <i class="fa-solid fa-file-export"></i> Baixar Descrição
-                    </button>
-                </div>
-                <div class="item-desc-text">Carregando detalhes...</div>
-                <div class="item-resources"></div>
+            <div class="card-progress-container">
+                <div class="card-progress-fill"></div>
             </div>
-            <div class="item-progress-bar"><div class="item-progress-fill"></div></div>
-        </div>`;
-    downloadQueue.appendChild(item);
+            <div class="card-actions">
+                <button class="btn-icon" onclick="startDownloadItem('${video.id}')" title="Baixar"><i class="fa-solid fa-play"></i></button>
+                <button class="btn-icon" onclick="removeTask('${video.id}')" title="Remover"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+        </div>
+    </div>`;
+    downloadQueue.insertAdjacentHTML('beforeend', html);
 }
 
 async function removeTask(id) { 
@@ -486,7 +464,7 @@ async function removeTask(id) {
         fetch('/api/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
     } catch(e) {}
 
-    const item = document.querySelector(`.queue-item[data-id="${id}"]`); 
+    const item = document.querySelector(`.card[data-id="${id}"]`); 
     if (item) { 
         item.remove(); 
         updateQueueCount(); 
@@ -545,12 +523,22 @@ async function loadHistory() {
     const res = await fetch('/api/history');
     const data = await res.json();
     currentPathDisplay.innerText = data.current_path;
+    
+    if (data.files.length === 0) {
+        historyList.innerHTML = '<div class="empty-history"><i class="fa-solid fa-ghost"></i><p>Nenhum download registado.</p></div>';
+        return;
+    }
+
     historyList.innerHTML = data.files.map(f => `
         <div class="history-item">
-            <div class="file-name" title="${f.name}">${f.name}</div>
+            <img src="${f.thumbnail || placeholder}" class="history-thumb" onerror="this.src='${placeholder}'">
+            <div class="history-info">
+                <div class="file-name" title="${f.title}">${f.title}</div>
+                <div class="file-date">${f.date} • ${f.format.toUpperCase()}</div>
+            </div>
             <div class="history-actions">
                 ${f.name.endsWith('.zip') ? '' : `<button class="play-btn" onclick="openPlayer('${f.name}')" title="Reproduzir"><i class="fa-solid fa-play"></i></button>`}
-                <button class="delete-btn" onclick="deleteHistoryFile('${f.name}')" title="Apagar"><i class="fa-solid fa-trash"></i></button>
+                <button class="delete-btn" onclick="deleteHistoryFile(${f.id}, '${f.title.replace(/'/g, "\\'")}')" title="Remover do Histórico"><i class="fa-solid fa-trash"></i></button>
             </div>
         </div>`).join('');
 }
@@ -586,11 +574,11 @@ const closePlayerFunc = () => {
 closePlayerBtn.onclick = closePlayerFunc;
 closePlayerX.onclick = closePlayerFunc;
 
-async function deleteHistoryFile(name) {
-    const confirmed = await showConfirm("Apagar Ficheiro?", `Deseja remover permanentemente "${name}"?`);
+async function deleteHistoryFile(id, title) {
+    const confirmed = await showConfirm("Remover do Histórico?", `Deseja remover o registo de "${title}"? O ficheiro continuará no seu computador.`);
     if (confirmed) { 
-        await fetch('/api/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) }); 
-        Notify.show("Apagado", "Ficheiro removido.", "info"); loadHistory(); 
+        await fetch('/api/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }); 
+        Notify.show("Removido", "Registo removido do histórico.", "info"); loadHistory(); 
     }
 }
 
@@ -701,6 +689,37 @@ async function downloadChapter(url, id, start, end, title) {
 
 document.getElementById('open-folder-btn').onclick = () => fetch('/api/open-folder', {method: 'POST'});
 document.getElementById('refresh-history').onclick = loadHistory;
+
+document.getElementById('clear-history-btn').onclick = async () => {
+    const confirmed = await showConfirm(
+        "Limpar Histórico?", 
+        "Esta ação apagará permanentemente todos os vídeos descarregados na pasta atual e limpará o registo de downloads. Deseja continuar?"
+    );
+    
+    if (!confirmed) return;
+
+    const btn = document.getElementById('clear-history-btn');
+    const originalIcon = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    btn.disabled = true;
+
+    try {
+        const res = await fetch('/api/clear-history', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            Notify.show("Histórico Limpo", `${data.count} ficheiros removidos com sucesso.`, "success");
+            loadHistory();
+        } else {
+            Notify.show("Erro", data.error || "Falha ao limpar histórico", "error");
+        }
+    } catch (err) {
+        Notify.show("Erro", "Erro de conexão ao servidor.", "error");
+    } finally {
+        btn.innerHTML = originalIcon;
+        btn.disabled = false;
+    }
+};
+
 document.getElementById('change-folder-btn').onclick = async () => {
     const res = await fetch('/api/select-folder', {method: 'POST'});
     const d = await res.json();

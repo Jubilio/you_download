@@ -14,6 +14,31 @@ import browser_cookie3
 import http.cookiejar
 
 import sys
+import queue
+import sqlite3
+
+DB_PATH = os.path.join(os.getcwd(), 'history.db')
+
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            video_id TEXT,
+            title TEXT,
+            channel TEXT,
+            thumbnail TEXT,
+            filename TEXT,
+            file_path TEXT,
+            date TEXT,
+            format TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+init_db()
 
 def get_static_path():
     if getattr(sys, 'frozen', False):
@@ -23,7 +48,11 @@ def get_static_path():
 
 app = Flask(__name__, static_folder=get_static_path(), static_url_path='')
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+# Usando async_mode='threading' para eliminar dependência do Eventlet (deprecated)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+
+# Fila de tarefas para controlo de concorrência
+task_queue = queue.Queue()
 
 DOWNLOAD_FOLDER = os.path.join(os.path.expanduser("~"), "Downloads")
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
@@ -51,34 +80,40 @@ def clean_ansi(text):
     if not text: return ""
     return re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', text)
 
-def progress_hook(d):
-    video_id = d.get('info_dict', {}).get('id')
-    if not video_id: return
-    
-    if video_id in cancelled_tasks:
-        raise DownloadCancelled("Interrompido")
+def make_progress_hook(task_id):
+    def hook(d):
+        if task_id in cancelled_tasks:
+            raise DownloadCancelled("Interrompido")
 
-    if d['status'] == 'downloading':
-        downloaded = d.get('downloaded_bytes', 0)
-        total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
-        percent = (downloaded / total * 100) if total > 0 else 0
-        
-        socketio.emit('progress', {
-            'id': video_id,
-            'percent': round(percent, 1),
-            'speed': clean_ansi(d.get('_speed_str', '0B/s')),
-            'eta': clean_ansi(d.get('_eta_str', '00:00')),
-            'status': 'downloading'
-        })
-    elif d['status'] == 'finished':
-        socketio.emit('progress', {'id': video_id, 'percent': 100, 'status': 'finished'})
+        if d['status'] == 'downloading':
+            downloaded = d.get('downloaded_bytes', 0)
+            total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
+            percent = (downloaded / total * 100) if total > 0 else 0
+            
+            # Log no terminal para observabilidade
+            print(f"[{task_id}] {percent:.1f}% | {clean_ansi(d.get('_speed_str', 'N/A'))} | ETA: {clean_ansi(d.get('_eta_str', 'N/A'))}")
+
+            socketio.emit('progress', {
+                'id': task_id,
+                'percent': round(percent, 1),
+                'speed': clean_ansi(d.get('_speed_str', '0B/s')),
+                'eta': clean_ansi(d.get('_eta_str', '00:00')),
+                'status': 'downloading'
+            })
+        elif d['status'] == 'finished':
+            print(f"[{task_id}] Download concluído. Iniciando processamento/merge...")
+            socketio.emit('progress', {'id': task_id, 'percent': 100, 'status': 'processing'})
+    return hook
 
 def get_common_opts():
     opts = {
-        'ignoreconfig': True, 'quiet': True, 'no_warnings': True, 
-        'download_archive': ARCHIVE_FILE, 'progress_hooks': [progress_hook],
+        'ignoreconfig': True, 'no_warnings': True, 
+        'download_archive': ARCHIVE_FILE,
         'nocheckcertificate': True,
-        'noplaylist': True, # 🔥 FUNDAMENTAL: Evita entrar em modo playlist
+        'noplaylist': True,
+        'fragment_retries': 10,
+        'retries': 10,
+        'hls_prefer_native': True, # Mais estável para vídeos longos
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
     if os.path.exists(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 0:
@@ -232,7 +267,7 @@ def get_info():
                 'id': info.get('id'), 'title': info.get('title'), 'thumbnail': main_thumbnail,
                 'channel': info.get('uploader') or info.get('channel'), 'description': info.get('description', ''),
                 'url': url, 'is_playlist': False, 'entries': entries, 'current_path': DOWNLOAD_FOLDER,
-                'chapters': info.get('chapters', [])
+                'chapters': info.get('chapters', []), 'duration': info.get('duration', 0)
             })
     except Exception as e: 
         print(f"[Error] Info Extraction: {str(e)}")
@@ -275,10 +310,29 @@ def video_details():
         print(f"[Error] Falha nos detalhes: {str(e)}")
         return jsonify({'description': f'Erro: {str(e)}', 'id': video_id})
 
+def add_to_history_db(video_id, title, channel, thumbnail, filename, file_path, format_type):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        date_str = time.strftime('%d/%m/%Y %H:%M')
+        cursor.execute('''
+            INSERT INTO history (video_id, title, channel, thumbnail, filename, file_path, date, format)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (video_id, title, channel, thumbnail, filename, file_path, date_str, format_type))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[DB Error] {str(e)}")
+
 @app.route('/api/download-single', methods=['POST'])
 def download_single():
     data = request.json
     url, video_id, format_type, playlist_title = data.get('url'), data.get('id'), data.get('format', 'mp4'), data.get('playlist_title', '')
+    # Metadados adicionais passados pelo frontend para o DB
+    title_hint = data.get('title', 'Vídeo')
+    channel_hint = data.get('channel', 'Canal')
+    thumb_hint = data.get('thumbnail', '')
+
     def run_download():
         try:
             socketio.emit('progress', {'id': video_id, 'percent': 0, 'status': 'starting'})
@@ -292,9 +346,26 @@ def download_single():
                 'merge_output_format': 'mp4' if format_type == 'mp4' else None, 
                 'nopart': True, 
                 'restrictfilenames': True,
+                'progress_hooks': [make_progress_hook(video_id)]
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([url])
+                info = ydl.extract_info(url, download=True)
+                final_filename = ydl.prepare_filename(info)
+                # O merge_output_format pode mudar a extensão, vamos garantir o nome real
+                if format_type == 'mp4' and not final_filename.endswith('.mp4'):
+                    final_filename = os.path.splitext(final_filename)[0] + '.mp4'
+                
+                # Salvar no Banco de Dados
+                add_to_history_db(
+                    video_id, 
+                    info.get('title', title_hint), 
+                    info.get('uploader', channel_hint), 
+                    info.get('thumbnail', thumb_hint),
+                    os.path.basename(final_filename),
+                    final_filename,
+                    format_type
+                )
+            
             socketio.emit('progress', {'id': video_id, 'percent': 100, 'status': 'finished'})
         except DownloadCancelled:
             socketio.emit('progress', {'id': video_id, 'percent': 0, 'status': 'cancelled'})
@@ -304,7 +375,7 @@ def download_single():
         finally:
             if video_id in cancelled_tasks: cancelled_tasks.remove(video_id)
     
-    threading.Thread(target=run_download).start()
+    task_queue.put((run_download, ()))
     return jsonify({'success': True})
 
 @app.route('/api/cancel', methods=['POST'])
@@ -351,41 +422,36 @@ def download_section():
             socketio.emit('progress', {'id': section_id, 'percent': 0, 'status': 'starting'})
             out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"%(title)s - {title}.%(ext)s")
             
-            # Formata a seção para o yt-dlp
-            def to_time(s):
-                h = int(s // 3600)
-                m = int((s % 3600) // 60)
-                s = int(s % 60)
-                return f"{h:02d}:{m:02d}:{s:02d}"
-
-            start_str = to_time(start)
-            end_str = to_time(end)
-            
             ydl_opts = {
                 **get_common_opts(), 
                 'format': 'bestvideo+bestaudio/best' if format_type == 'mp4' else 'bestaudio/best', 
                 'outtmpl': out_tmpl, 
                 'force_keyframes_at_cuts': True,
                 'nopart': True,
-                'external_downloader': 'ffmpeg',
-                'external_downloader_args': {
-                    'ffmpeg_i': ['-ss', start_str, '-to', end_str]
-                },
+                'download_ranges': yt_dlp.utils.download_range_func(None, [(start, end)]),
+                'progress_hooks': [make_progress_hook(section_id)],
+                'postprocessor_args': {
+                    'ffmpeg': ['-err_detect', 'ignore_err', '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5']
+                }
             }
             
-            def section_hook(d):
-                if section_id in cancelled_tasks: raise DownloadCancelled("Recorte cancelado")
-                if d['status'] == 'downloading':
-                    downloaded = d.get('downloaded_bytes', 0)
-                    total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
-                    percent = (downloaded / total * 100) if total > 0 else 0
-                    socketio.emit('progress', {'id': section_id, 'percent': round(percent, 1), 'status': 'downloading'})
-                elif d['status'] == 'finished':
-                    socketio.emit('progress', {'id': section_id, 'percent': 100, 'status': 'finished'})
-            
-            ydl_opts['progress_hooks'] = [section_hook]
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([url])
+                info = ydl.extract_info(url, download=True)
+                final_filename = ydl.prepare_filename(info)
+                if format_type == 'mp4' and not final_filename.endswith('.mp4'):
+                    final_filename = os.path.splitext(final_filename)[0] + '.mp4'
+                
+                # Salvar no DB como um recorte
+                add_to_history_db(
+                    section_id, 
+                    f"{info.get('title', 'Vídeo')} (Corte: {title})", 
+                    info.get('uploader', 'Canal'), 
+                    info.get('thumbnail', ''),
+                    os.path.basename(final_filename),
+                    final_filename,
+                    format_type
+                )
+            
             socketio.emit('progress', {'id': section_id, 'percent': 100, 'status': 'finished'})
         except DownloadCancelled:
             socketio.emit('progress', {'id': section_id, 'percent': 0, 'status': 'cancelled'})
@@ -395,8 +461,8 @@ def download_section():
         finally:
             if section_id in cancelled_tasks: cancelled_tasks.remove(section_id)
             
-    threading.Thread(target=run_download).start()
-    print(f"[Sistema] Tarefa de recorte iniciada: {section_id}")
+    task_queue.put((run_download, ()))
+    print(f"[Sistema] Recorte adicionado à fila: {section_id}")
     return jsonify({'success': True, 'taskId': section_id})
 
 @app.route('/api/progress-all', methods=['POST'])
@@ -407,20 +473,29 @@ def get_all_progress():
 
 @app.route('/api/history', methods=['GET'])
 def get_history():
-    files = []
-    allowed_exts = ('.mp4', '.mp3', '.webm', '.mkv', '.m4a') # Incluímos os mais comuns do YouTube
-    if os.path.exists(DOWNLOAD_FOLDER):
-        for root, dirs, filenames in os.walk(DOWNLOAD_FOLDER):
-            for f in filenames:
-                if f.lower().endswith(allowed_exts):
-                    path = os.path.join(root, f)
-                    stats = os.stat(path)
-                    files.append({
-                        'name': f, 
-                        'size': f"{stats.st_size / (1024*1024):.1f} MB", 
-                        'date': time.strftime('%d/%m/%Y', time.localtime(stats.st_mtime))
-                    })
-    return jsonify({'files': sorted(files, key=lambda x: x['date'], reverse=True), 'current_path': DOWNLOAD_FOLDER})
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM history ORDER BY id DESC')
+        rows = cursor.fetchall()
+        files = []
+        for row in rows:
+            files.append({
+                'id': row['id'],
+                'video_id': row['video_id'],
+                'name': row['filename'],
+                'title': row['title'],
+                'channel': row['channel'],
+                'thumbnail': row['thumbnail'],
+                'date': row['date'],
+                'format': row['format']
+            })
+        conn.close()
+        return jsonify({'files': files, 'current_path': DOWNLOAD_FOLDER})
+    except Exception as e:
+        print(f"[DB History Error] {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/update-engine', methods=['POST'])
 def update_engine():
@@ -447,10 +522,33 @@ def open_folder(): subprocess.Popen(f'explorer "{DOWNLOAD_FOLDER}"'); return jso
 @app.route('/api/delete', methods=['POST'])
 def delete_file():
     try:
-        filename = request.json.get('name')
-        for root, dirs, filenames in os.walk(DOWNLOAD_FOLDER):
-            if filename in filenames: os.remove(os.path.join(root, filename)); return jsonify({'success': True})
-        return jsonify({'error': 'Não encontrado'}), 404
+        row_id = request.json.get('id')
+        if not row_id:
+            return jsonify({'error': 'ID em falta'}), 400
+            
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM history WHERE id = ?', (row_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True})
+    except Exception as e: return jsonify({'error': str(e)}), 500
+
+@app.route('/api/clear-history', methods=['POST'])
+def clear_history():
+    try:
+        # 1. Limpar o arquivo de archive do yt-dlp
+        if os.path.exists(ARCHIVE_FILE):
+            with open(ARCHIVE_FILE, 'w') as f: f.write("")
+            
+        # 2. Limpar a tabela do SQLite em vez de deletar arquivos
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM history')
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True})
     except Exception as e: return jsonify({'error': str(e)}), 500
 
 @app.route('/api/stream/<path:filename>')
@@ -465,7 +563,25 @@ def stream_file(filename):
 @app.route('/')
 def index(): return app.send_static_file('index.html')
 
+def task_worker():
+    """Worker que processa a fila de downloads de forma controlada."""
+    print("[Sistema] Worker de downloads iniciado.")
+    while True:
+        task = task_queue.get()
+        if task is None: break
+        
+        func, args = task
+        try:
+            func(*args)
+        except Exception as e:
+            print(f"[Erro Fila] Erro ao processar tarefa: {str(e)}")
+        finally:
+            task_queue.task_done()
+
 if __name__ == '__main__':
+    # Iniciar worker em background
+    threading.Thread(target=task_worker, daemon=True).start()
+
     # Configuração de Host: 127.0.0.1 para local (seguro), 0.0.0.0 para Docker/Nuvem
     is_frozen = getattr(sys, 'frozen', False)
     host_addr = '127.0.0.1' if is_frozen else '0.0.0.0'
