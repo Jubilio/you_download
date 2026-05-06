@@ -12,7 +12,15 @@ import traceback
 import browser_cookie3
 import http.cookiejar
 
-app = Flask(__name__, static_folder='frontend', static_url_path='')
+import sys
+
+def get_static_path():
+    if getattr(sys, 'frozen', False):
+        # Caminho quando empacotado pelo PyInstaller
+        return os.path.join(sys._MEIPASS, 'frontend')
+    return 'frontend'
+
+app = Flask(__name__, static_folder=get_static_path(), static_url_path='')
 CORS(app)
 
 DOWNLOAD_FOLDER = os.path.join(os.path.expanduser("~"), "Downloads")
@@ -351,6 +359,15 @@ def stream_file(filename):
         if filename in filenames:
             return send_file(os.path.join(root, filename))
     return "Ficheiro não encontrado", 404
+
+@app.route('/api/update-engine', methods=['POST'])
+def update_engine():
+    """Atualiza o yt-dlp para a versão mais recente."""
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"])
+        return jsonify({'success': True, 'message': 'Motor atualizado com sucesso!'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/')
 def index(): return app.send_static_file('index.html')

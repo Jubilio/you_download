@@ -142,6 +142,20 @@ window.addEventListener('click', (e) => {
     if (e.target === playerModal) closePlayerFunc();
 });
 
+document.getElementById('update-engine-btn').onclick = async () => {
+    const btn = document.getElementById('update-engine-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Atualizando...';
+    try {
+        const res = await fetch('/api/update-engine', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) Notify.show("Sucesso", data.message, "success");
+        else Notify.show("Erro", data.message, "error");
+    } catch (err) { Notify.show("Erro", err.message, "error"); }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-sync"></i> Atualizar Motor';
+};
+
 saveCookiesBtn.onclick = async () => {
     const cookies = cookiesInput.value.trim();
     if (!cookies) return Notify.show("Aviso", "Cole o conteúdo ou arraste o ficheiro.", "error");

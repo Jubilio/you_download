@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexoVibe YouDown | Setup Interface</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #00f2ff;
+            --secondary: #7000ff;
+            --bg: #050508;
+            --card: rgba(255, 255, 255, 0.03);
+            --border: rgba(255, 255, 255, 0.1);
+            --text: #e0e0e0;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Animated Background */
+        .bg-glow {
+            position: fixed;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, var(--secondary) 0%, transparent 70%);
+            filter: blur(100px);
+            opacity: 0.15;
+            z-index: -1;
+            animation: move 20s infinite alternate;
+        }
+
+        @keyframes move {
+            from { transform: translate(-50%, -50%); }
+            to { transform: translate(50%, 50%); }
+        }
+
+        .installer-card {
+            width: 900px;
+            height: 600px;
+            background: var(--card);
+            backdrop-filter: blur(30px);
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            overflow: hidden;
+            box-shadow: 0 50px 100px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: rgba(0,0,0,0.2);
+            padding: 40px;
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .logo { display: flex; align-items: center; gap: 15px; }
+        .logo i { font-size: 2rem; color: var(--primary); }
+        .logo span { font-weight: 800; font-size: 1.5rem; letter-spacing: -1px; }
+
+        .steps { list-style: none; margin-top: 50px; }
+        .step-item { 
+            display: flex; 
+            align-items: center; 
+            gap: 15px; 
+            margin-bottom: 30px; 
+            opacity: 0.3;
+            transition: 0.5s;
+        }
+        .step-item.active { opacity: 1; color: var(--primary); }
+        .step-item i { width: 30px; }
+
+        /* Main Content */
+        .content { padding: 60px; position: relative; }
+        
+        .view { display: none; animation: fadeIn 0.8s ease forwards; }
+        .view.active { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h2 { font-size: 2.5rem; margin-bottom: 20px; font-weight: 800; }
+        p { line-height: 1.6; color: #aaa; margin-bottom: 30px; }
+
+        .requirement-list { margin-bottom: 40px; }
+        .req-item { 
+            display: flex; 
+            justify-content: space-between; 
+            padding: 15px; 
+            background: rgba(255,255,255,0.02); 
+            border-radius: 12px;
+            margin-bottom: 10px;
+            border: 1px solid transparent;
+        }
+        .req-item.checked { border-color: var(--primary); background: rgba(0, 242, 255, 0.05); }
+
+        .btn-next {
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            border: none;
+            color: white;
+            padding: 15px 40px;
+            border-radius: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .btn-next:hover { transform: scale(1.05); box-shadow: 0 0 30px rgba(0, 242, 255, 0.3); }
+
+        /* Progress Bar Area */
+        .progress-container { margin-top: 50px; }
+        .progress-bar { height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden; }
+        .progress-fill { width: 0%; height: 100%; background: var(--primary); transition: 2s ease-in-out; box-shadow: 0 0 15px var(--primary); }
+
+        .terminal {
+            background: #000;
+            padding: 20px;
+            border-radius: 15px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: #0f0;
+            height: 150px;
+            overflow: hidden;
+            margin-top: 20px;
+            border: 1px solid #333;
+        }
+
+        .nexo-link { color: var(--primary); text-decoration: none; font-size: 0.8rem; opacity: 0.5; }
+        .nexo-link:hover { opacity: 1; }
+
+    </style>
+</head>
+<body>
+    <div class="bg-glow"></div>
+
+    <div class="installer-card">
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fa-solid fa-bolt"></i>
+                <span>YouDown <small style="font-size: 0.6rem; vertical-align: middle;">PRO</small></span>
+            </div>
+            
+            <ul class="steps">
+                <li class="step-item active" id="s1"><i class="fa-solid fa-shield-halved"></i> Verificação</li>
+                <li class="step-item" id="s2"><i class="fa-solid fa-microchip"></i> Dependências</li>
+                <li class="step-item" id="s3"><i class="fa-solid fa-rocket"></i> Finalização</li>
+            </ul>
+
+            <a href="https://nexovibe.netlify.app/" target="_blank" class="nexo-link">nexovibe.systems</a>
+        </aside>
+
+        <main class="content">
+            <!-- View 1: Welcome & Checks -->
+            <div class="view active" id="v1">
+                <h2>Inicializar Core</h2>
+                <p>Bem-vindo ao instalador inteligente NexoVibe. Vamos preparar o ambiente para download de alta performance.</p>
+                
+                <div class="requirement-list">
+                    <div class="req-item checked">
+                        <span><i class="fa-solid fa-check"></i> Python Engine 3.x</span>
+                        <span style="color: var(--primary)">OK</span>
+                    </div>
+                    <div class="req-item" id="ffmpeg-req">
+                        <span><i class="fa-solid fa-hourglass-half"></i> FFmpeg Multimedia Engine</span>
+                        <span id="ffmpeg-status" style="color: #f0f">DETECTANDO...</span>
+                    </div>
+                </div>
+
+                <button class="btn-next" onclick="nextStep(2)">Próximo Passo <i class="fa-solid fa-arrow-right"></i></button>
+            </div>
+
+            <!-- View 2: Installation Animation -->
+            <div class="view" id="v2">
+                <h2>Processar Binários</h2>
+                <p>Estamos a configurar os módulos de sincronização de cookies e o motor de segmentação yt-dlp.</p>
+                
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="p-fill"></div>
+                    </div>
+                    <div class="terminal" id="term">
+                        > Initializing NexoVibe Core...<br>
+                        > Linking yt-dlp 2024.03.10...<br>
+                        > Setting up Glassmorphism UI...
+                    </div>
+                </div>
+
+                <button class="btn-next" style="margin-top: 30px; display: none;" id="btn-to-3" onclick="nextStep(3)">Continuar <i class="fa-solid fa-arrow-right"></i></button>
+            </div>
+
+            <!-- View 3: Success -->
+            <div class="view" id="v3">
+                <div style="text-align: center; padding-top: 40px;">
+                    <i class="fa-solid fa-circle-check" style="font-size: 5rem; color: var(--primary); margin-bottom: 30px;"></i>
+                    <h2>Sistema Pronto</h2>
+                    <p>O YouDown Premium foi configurado com sucesso pela NexoVibe. Você está pronto para extrair conteúdo.</p>
+                    
+                    <div style="display: flex; gap: 15px; justify-content: center;">
+                        <button class="btn-next" onclick="window.close()">Lançar Dashboard</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function nextStep(step) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.step-item').forEach(s => s.classList.remove('active'));
+            
+            document.getElementById('v' + step).classList.add('active');
+            document.getElementById('s' + step).classList.add('active');
+
+            if(step === 2) {
+                simulateInstall();
+            }
+        }
+
+        function simulateInstall() {
+            const fill = document.getElementById('p-fill');
+            const term = document.getElementById('term');
+            const btn = document.getElementById('btn-to-3');
+            
+            fill.style.width = '100%';
+            
+            const logs = [
+                "> Injecting CSS Glass Tokens...",
+                "> Mapping Cookie Synchronization...",
+                "> Validating FFmpeg pipeline...",
+                "> Compiling Clipping Engine...",
+                "> NexoVibe Protocol Enabled.",
+                "> DONE."
+            ];
+
+            let i = 0;
+            const interval = setInterval(() => {
+                if(i < logs.length) {
+                    term.innerHTML += `<br>> ${logs[i]}`;
+                    term.scrollTop = term.scrollHeight;
+                    i++;
+                } else {
+                    clearInterval(interval);
+                    btn.style.display = 'flex';
+                }
+            }, 600);
+        }
+
+        // Simular deteção de FFmpeg
+        setTimeout(() => {
+            document.getElementById('ffmpeg-req').classList.add('checked');
+            document.getElementById('ffmpeg-status').innerText = 'READY';
+            document.getElementById('ffmpeg-status').style.color = '#00f2ff';
+        }, 2000);
+    </script>
+</body>
+</html>
