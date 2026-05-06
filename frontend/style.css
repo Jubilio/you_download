@@ -241,12 +241,6 @@ footer a:hover { text-decoration: underline; }
 .notification.success .notif-progress-inner { background: #00ffcc; }
 .notification.error .notif-progress-inner { background: #ff0055; }
 .notification.info .notif-progress-inner { background: #a855f7; }
-    filter: drop-shadow(0 0 5px rgba(255,255,255,0.3));
-}
-
-.toast-content h4 { font-size: 0.9rem; font-weight: 800; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 1px; }
-.toast-content p { font-size: 0.8rem; color: var(--text-dim); }
-
 /* Custom Confirm Modal */
 .modal-overlay {
     position: fixed;

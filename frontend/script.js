@@ -438,7 +438,19 @@ function addVideoToQueue(video) {
     downloadQueue.appendChild(item);
 }
 
-function removeTask(id) { const item = document.querySelector(`.queue-item[data-id="${id}"]`); if (item) { item.remove(); updateQueueCount(); } }
+async function removeTask(id) { 
+    // Notifica o backend para parar o download se estiver a correr
+    try {
+        fetch('/api/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+    } catch(e) {}
+
+    const item = document.querySelector(`.queue-item[data-id="${id}"]`); 
+    if (item) { 
+        item.remove(); 
+        updateQueueCount(); 
+        activeTasks.delete(id);
+    } 
+}
 
 async function toggleItemDetails(id) {
     const panel = document.getElementById(`details-${id}`);

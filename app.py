@@ -31,6 +31,9 @@ ARCHIVE_FILE = os.path.join(os.getcwd(), 'downloaded_history.txt')
 NODE_PATH = r'C:\Program Files\nodejs\node.exe'
 
 progress_store = {}
+cancelled_tasks = set()
+
+class DownloadCancelled(Exception): pass
 
 def check_ffmpeg():
     try:
@@ -49,6 +52,11 @@ def clean_ansi(text):
 def progress_hook(d):
     video_id = d.get('info_dict', {}).get('id')
     if not video_id: return
+    
+    # Verifica se foi cancelado
+    if video_id in cancelled_tasks:
+        raise DownloadCancelled("Download interrompido pelo utilizador")
+
     if d['status'] == 'downloading':
         downloaded = d.get('downloaded_bytes', 0)
         total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
@@ -275,12 +283,25 @@ def download_single():
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
+        except DownloadCancelled:
+            print(f"[Cancelado] Download de {video_id} interrompido.")
+            progress_store[video_id] = {'percent': 0, 'status': 'cancelled'}
         except Exception as e:
             print(f"[Erro Download] {str(e)}")
             progress_store[video_id] = {'percent': 0, 'status': 'error', 'msg': str(e)}
+        finally:
+            if video_id in cancelled_tasks: cancelled_tasks.remove(video_id)
     
     threading.Thread(target=run_download).start()
     return jsonify({'success': True})
+
+@app.route('/api/cancel', methods=['POST'])
+def cancel_download():
+    video_id = request.json.get('id')
+    if video_id:
+        cancelled_tasks.add(video_id)
+        return jsonify({'success': True})
+    return jsonify({'error': 'ID em falta'}), 400
 
 @app.route('/api/install-ffmpeg', methods=['POST'])
 def install_ffmpeg():
@@ -318,7 +339,7 @@ def download_section():
             progress_store[section_id] = {'percent': 0, 'status': 'starting'}
             out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"%(title)s - {title}.%(ext)s")
             
-            # Formata a seção para o yt-dlp (formato string robusto)
+            # Formata a seção para o yt-dlp
             def to_time(s):
                 h = int(s // 3600)
                 m = int((s % 3600) // 60)
@@ -327,7 +348,6 @@ def download_section():
 
             start_str = to_time(start)
             end_str = to_time(end)
-            section_str = f"*{start_str}-{end_str}"
             
             ydl_opts = {
                 **get_common_opts(), 
@@ -339,11 +359,13 @@ def download_section():
                 'external_downloader_args': {
                     'ffmpeg_i': ['-ss', start_str, '-to', end_str]
                 },
-                'hls_use_mpegts': True, # Ajuda na estabilidade de streams longos
+                'hls_use_mpegts': True,
             }
             
-            # Sobrescreve o progress_hook para usar o section_id
             def section_hook(d):
+                if section_id in cancelled_tasks:
+                    raise DownloadCancelled("Recorte cancelado")
+                    
                 if d['status'] == 'downloading':
                     downloaded = d.get('downloaded_bytes', 0)
                     total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
@@ -353,11 +375,16 @@ def download_section():
                     progress_store[section_id] = {'percent': 100, 'status': 'finished'}
             
             ydl_opts['progress_hooks'] = [section_hook]
-            
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl: ydl.download([url])
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+        except DownloadCancelled:
+            print(f"[Cancelado] Recorte {section_id} interrompido.")
+            progress_store[section_id] = {'percent': 0, 'status': 'cancelled'}
         except Exception as e: 
-            print(f"Error cutting: {str(e)}")
-            progress_store[section_id] = {'percent': 0, 'status': 'error'}
+            print(f"[Erro Recorte] {str(e)}")
+            progress_store[section_id] = {'percent': 0, 'status': 'error', 'msg': str(e)}
+        finally:
+            if section_id in cancelled_tasks: cancelled_tasks.remove(section_id)
             
     threading.Thread(target=run_download).start()
     return jsonify({'success': True, 'task_id': section_id})
