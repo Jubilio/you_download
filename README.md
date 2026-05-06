@@ -25,7 +25,10 @@ Um dashboard desktop-like de última geração para download de mídia do YouTub
 
 - **Backend**: Python 3.11+, Flask, yt-dlp, browser_cookie3.
 - **Frontend**: Vanilla JavaScript (ES6+), CSS Moderno (Variables, Flexbox, Grid), FontAwesome 6.
-- **Segurança**: Bypass inteligente de bot detection e suporte a autenticação via cookies.
+- **Segurança e Ética**:
+    - 🛡️ **Consentimento Explícito**: O YouDown nunca extrai cookies silenciosamente. Toda sincronização exige autorização manual do usuário.
+    - 🔒 **Abordagem Híbrida**: Além da sincronização automática local, o app suporta importação manual via extensão do browser para total controle e privacidade.
+    - 🍪 **Foco em Domínio**: Apenas cookies relacionados ao `youtube.com` são processados.
 
 ---
 

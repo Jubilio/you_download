@@ -141,19 +141,26 @@ saveCookiesBtn.onclick = async () => {
 };
 
 syncCookiesBtn.onclick = async () => {
+    const confirmed = await showConfirm(
+        "Autorizar Sincronização?", 
+        "O YouDown tentará ler os cookies de sessão do YouTube nos seus navegadores instalados para permitir downloads de vídeos restritos. Deseja continuar?"
+    );
+    
+    if (!confirmed) return;
+
     syncCookiesBtn.disabled = true;
     syncCookiesBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> A Sincronizar...';
     try {
         const res = await fetch('/api/sync-cookies', { method: 'POST' });
         const data = await res.json();
         if (data.success) {
-            Notify.show("Sincronizado", `Conectado ao ${data.browser.toUpperCase()}`, "success");
+            Notify.show("Sincronizado", `Conectado ao ${data.browser}`, "success");
             cookiesModal.classList.add('hidden');
         } else { Notify.show("Falha", data.message, "error"); }
     } catch (err) { Notify.show("Erro", "Erro na sincronização.", "error"); }
     finally {
         syncCookiesBtn.disabled = false;
-        syncCookiesBtn.innerHTML = '<i class="fa-solid fa-sync"></i> Tentativa Automática (Feche o Browser)';
+        syncCookiesBtn.innerHTML = '<i class="fa-solid fa-sync"></i> Tentativa Automática (Recomendado)';
     }
 };
 

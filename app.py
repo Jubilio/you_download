@@ -9,6 +9,8 @@ import tkinter as tk
 from tkinter import filedialog
 import re
 import traceback
+import browser_cookie3
+import http.cookiejar
 
 app = Flask(__name__, static_folder='frontend', static_url_path='')
 CORS(app)
@@ -76,45 +78,56 @@ def get_browser_cookie_path(browser_name):
 
 @app.route('/api/sync-cookies', methods=['POST'])
 def sync_cookies():
-    browsers = ['brave', 'chrome', 'edge']
+    """Sincroniza cookies usando browser-cookie3 para maior compatibilidade."""
     success_browser = None
     
-    for browser in browsers:
+    # Lista de funções de extração do browser-cookie3
+    extraction_methods = [
+        ('edge', browser_cookie3.edge),
+        ('chrome', browser_cookie3.chrome),
+        ('brave', browser_cookie3.brave),
+        ('firefox', browser_cookie3.firefox),
+        ('opera', browser_cookie3.opera)
+    ]
+    
+    for name, method in extraction_methods:
         try:
-            print(f"[Sync] Sincronização invisível para {browser}...")
-            # Truque: Usamos o comando do sistema para tentar forçar a cópia mesmo se trancado
-            # O yt-dlp tem um parâmetro interno que tenta lidar com isso
-            temp_cookies = os.path.join(os.getcwd(), 'temp_cookies.txt')
+            print(f"[Sync] Tentando extrair cookies do {name}...")
+            # Extrai cookies filtrando apenas para youtube.com
+            cj = method(domain_name='youtube.com')
             
-            # Limpa lixo anterior
-            if os.path.exists(temp_cookies): os.remove(temp_cookies)
-            
-            ydl_opts = {
-                'quiet': True, 'no_warnings': True,
-                'cookiesfrombrowser': (browser,),
-                'cookiefile': temp_cookies,
-                'extract_flat': True, 'skip_download': True
-            }
-            
-            # Tenta a extração mágica
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.extract_info("https://www.youtube.com/favicon.ico", download=False)
-            
-            if os.path.exists(temp_cookies) and os.path.getsize(temp_cookies) > 100:
-                if os.path.exists(COOKIES_FILE): os.remove(COOKIES_FILE)
-                os.rename(temp_cookies, COOKIES_FILE)
-                success_browser = browser
-                break
+            if cj:
+                # Salva no formato Netscape (o que o yt-dlp gosta)
+                with open(COOKIES_FILE, 'w', encoding='utf-8') as f:
+                    f.write("# Netscape HTTP Cookie File\n")
+                    f.write("# http://curl.haxx.se/rfc/cookie_spec.html\n")
+                    f.write("# This is a generated file!  Do not edit.\n\n")
+                    
+                    for cookie in cj:
+                        # Formato: domain, flag, path, secure, expiration, name, value
+                        domain = cookie.domain
+                        flag = "TRUE" if domain.startswith('.') else "FALSE"
+                        path = cookie.path
+                        secure = "TRUE" if cookie.secure else "FALSE"
+                        expires = str(cookie.expires) if cookie.expires else "0"
+                        name_val = cookie.name
+                        value = cookie.value
+                        
+                        f.write(f"{domain}\t{flag}\t{path}\t{secure}\t{expires}\t{name_val}\t{value}\n")
+                
+                if os.path.exists(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 100:
+                    success_browser = name
+                    break
         except Exception as e:
-            print(f"[Sync] Falha no {browser}: {str(e)}")
+            print(f"[Sync] Falha no {name}: {str(e)}")
             continue
 
     if success_browser:
-        return jsonify({'success': True, 'browser': success_browser})
+        return jsonify({'success': True, 'browser': success_browser.capitalize()})
     
     return jsonify({
         'success': False, 
-        'message': 'Não foi possível extrair automaticamente. Por favor, use o método de Arrastar o ficheiro cookies.txt para o quadrado abaixo.'
+        'message': 'Não foi possível encontrar cookies ativos. Certifique-se de que o YouTube está aberto no navegador e tente novamente.'
     })
 
 @app.route('/api/save-cookies', methods=['POST'])
