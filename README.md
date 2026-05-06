@@ -99,4 +99,4 @@ you_down/
 ---
 
 **Última atualização:** Maio 2026  
-**Desenvolvido com ❤️ para a comunidade.**
+**Desenvolvido com ❤️ por [NexoVibe](https://nexovibe.netlify.app/)**

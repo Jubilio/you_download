@@ -160,6 +160,19 @@ video, audio { display: block; border-radius: 8px; }
 video { max-height: 60vh; background: #000; }
 audio { padding: 20px; width: 100%; }
 
+/* Logo e Branding */
+.logo { display: flex; align-items: center; gap: 12px; }
+.logo i { font-size: 2rem; color: var(--primary); }
+.logo span { color: var(--primary); }
+.brand-credit { font-size: 0.7rem; color: var(--text-dim); text-decoration: none; align-self: flex-end; margin-bottom: 5px; background: rgba(99, 102, 241, 0.1); padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(99, 102, 241, 0.2); transition: 0.3s; }
+.brand-credit:hover { background: var(--primary); color: white; transform: translateY(-2px); }
+
+/* Footer */
+footer { margin-top: 50px; text-align: center; padding: 20px; border-top: 1px solid var(--glass-border); }
+footer p { font-size: 0.8rem; color: var(--text-dim); }
+footer a { color: var(--primary); text-decoration: none; font-weight: 700; }
+footer a:hover { text-decoration: underline; }
+
 /* --- SISTEMA DE ALERTAS FUTURISTAS --- */
 .notification-container {
     position: fixed;
