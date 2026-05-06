@@ -126,14 +126,40 @@ header { margin-bottom: 30px; display: flex; justify-content: space-between; ali
 }
 .resources-section h4, .chapters-section h4 { font-size: 0.9rem; margin-bottom: 10px; color: var(--text-dim); }
 
-.chapters-list { display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; padding-right: 5px; }
-.chapter-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(255,255,255,0.03); border-radius: 10px; border: 1px solid transparent; transition: 0.3s; }
-.chapter-item:hover { background: rgba(255,255,255,0.06); border-color: var(--primary); }
-.chapter-info { display: flex; flex-direction: column; }
+.chapters-list { display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; padding-right: 5px; margin-top: 10px; }
+.chapter-item { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    padding: 12px 15px; 
+    background: rgba(255, 255, 255, 0.03); 
+    border-radius: 12px; 
+    border: 1px solid transparent;
+    transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.chapter-item:hover { 
+    background: rgba(99, 102, 241, 0.08); 
+    border-color: var(--primary);
+    transform: translateX(5px);
+}
+.chapter-info { display: flex; flex-direction: column; gap: 2px; }
 .chapter-title { font-size: 0.85rem; font-weight: 600; color: var(--text-main); }
 .chapter-time { font-size: 0.75rem; color: var(--primary); font-family: monospace; }
-.btn-cut { background: var(--primary); border: none; color: white; padding: 5px 12px; border-radius: 6px; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: 0.2s; }
-.btn-cut:hover { background: var(--primary-hover); transform: scale(1.05); }
+.btn-cut { 
+    background: var(--primary); 
+    color: white; 
+    border: none; 
+    padding: 6px 14px; 
+    border-radius: 8px; 
+    font-size: 0.75rem; 
+    cursor: pointer; 
+    display: flex; 
+    align-items: center; 
+    gap: 8px;
+    transition: 0.3s;
+    font-weight: 600;
+}
+.btn-cut:hover { transform: scale(1.05); filter: brightness(1.2); box-shadow: 0 0 15px rgba(99, 102, 241, 0.4); }
 
 .custom-clip-form { display: flex; align-items: flex-end; gap: 15px; margin-top: 10px; flex-wrap: wrap; }
 .input-group-sm { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 120px; }
