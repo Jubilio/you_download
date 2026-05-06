@@ -20,6 +20,13 @@ const toggleDescBtn = document.getElementById('toggle-desc');
 const downloadDescBtn = document.getElementById('download-desc-btn');
 const chaptersSection = document.getElementById('chapters-section');
 const chaptersList = document.getElementById('chapters-list');
+const customClipSection = document.getElementById('custom-clip-section');
+const clipStartInput = document.getElementById('clip-start');
+const clipEndInput = document.getElementById('clip-end');
+const btnCustomCut = document.getElementById('btn-custom-cut');
+const bulkClipSection = document.getElementById('bulk-clip-section');
+const tocInput = document.getElementById('toc-input');
+const btnProcessToc = document.getElementById('btn-process-toc');
 
 // Elementos do Modal de Cookies
 const settingsBtn = document.getElementById('settings-btn');
@@ -29,6 +36,10 @@ const saveCookiesBtn = document.getElementById('save-cookies-btn');
 const syncCookiesBtn = document.getElementById('sync-cookies-btn');
 const cookiesInput = document.getElementById('cookies-input');
 const dropZone = document.getElementById('drop-zone');
+const infoBtn = document.getElementById('info-btn');
+const helpModal = document.getElementById('help-modal');
+const closeHelp = document.getElementById('close-help');
+const closeHelpX = document.getElementById('close-help-x');
 
 // Elementos de Notificação e Confirm
 const notificationContainer = document.getElementById('notification-container');
@@ -106,6 +117,10 @@ const closeModalFunc = () => {
     cookiesModal.classList.add('hidden');
 };
 
+const closeHelpFunc = () => {
+    helpModal.classList.add('hidden');
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     loadHistory();
     setInterval(updateAllProgress, 1000);
@@ -117,8 +132,14 @@ settingsBtn.addEventListener('click', () => cookiesModal.classList.remove('hidde
 closeModal.addEventListener('click', closeModalFunc);
 closeXBtn.addEventListener('click', closeModalFunc);
 
+infoBtn.addEventListener('click', () => helpModal.classList.remove('hidden'));
+closeHelp.addEventListener('click', closeHelpFunc);
+closeHelpX.addEventListener('click', closeHelpFunc);
+
 window.addEventListener('click', (e) => {
     if (e.target === cookiesModal) closeModalFunc();
+    if (e.target === helpModal) closeHelpFunc();
+    if (e.target === playerModal) closePlayerFunc();
 });
 
 saveCookiesBtn.onclick = async () => {
@@ -238,6 +259,7 @@ async function fetchInfo() {
         if (!response.ok) throw new Error(data.error);
 
         videoTitle.innerText = data.title;
+        videoTitle.dataset.videoId = data.id; // Guardar ID para o recorte manual
         videoThumbnail.src = data.thumbnail || "";
         videoChannel.innerText = data.channel;
         videoDescription.innerHTML = linkify(data.description);
@@ -266,6 +288,16 @@ async function fetchInfo() {
             });
         } else {
             chaptersSection.classList.add('hidden');
+        }
+        
+        // Mostrar sempre a secção de recorte manual se for vídeo único
+        if (!data.is_playlist) {
+            customClipSection.classList.remove('hidden');
+            bulkClipSection.classList.remove('hidden');
+            videoTitle.dataset.duration = data.duration || 0; // Guardar duração total
+        } else {
+            customClipSection.classList.add('hidden');
+            bulkClipSection.classList.add('hidden');
         }
 
         downloadQueue.innerHTML = "";
@@ -469,6 +501,72 @@ function linkify(text) {
     if (!text) return "";
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     return text.replace(urlRegex, (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="desc-link">${url}</a>`);
+}
+
+btnCustomCut.addEventListener('click', () => {
+    const start = clipStartInput.value.trim() || "00:00:00";
+    const end = clipEndInput.value.trim();
+    if (!end) return Notify.show("Erro", "Defina o tempo de fim.", "error");
+    
+    // Converter HH:MM:SS para segundos para a API (opcional, ou mudar a API para aceitar string)
+    // Vamos mudar a API para ser mais robusta, mas por agora convertemos
+    const startSec = timeToSeconds(start);
+    const endSec = timeToSeconds(end);
+    
+    if (endSec <= startSec) return Notify.show("Erro", "O fim deve ser após o início.", "error");
+    
+    const url = urlInput.value.trim();
+    const id = document.getElementById('video-title').dataset.videoId; // Precisamos guardar o ID
+    
+    downloadChapter(url, id, startSec, endSec, `Recorte_${start.replace(/:/g, '-')}`);
+});
+
+btnProcessToc.addEventListener('click', () => {
+    const text = tocInput.value.trim();
+    if (!text) return Notify.show("Aviso", "Cole o índice primeiro.", "info");
+    
+    const lines = text.split('\n');
+    const parsed = [];
+    // Regex para detetar tempos tipo (0:00), 12:34, 1:02:03
+    const timeRegex = /\[?\(?(\d{1,2}:?\d{1,2}:?\d{1,2})\)?\]?/;
+    
+    lines.forEach(line => {
+        const match = line.match(timeRegex);
+        if (match) {
+            const timeStr = match[1];
+            const title = line.replace(match[0], "").replace(/^[^\w]+/, "").trim();
+            parsed.push({ start: timeToSeconds(timeStr), title: title || "Aula" });
+        }
+    });
+
+    if (parsed.length === 0) return Notify.show("Erro", "Nenhum timestamp válido encontrado.", "error");
+
+    // Ordenar por tempo
+    parsed.sort((a, b) => a.start - b.start);
+
+    // Calcular o fim de cada segmento (o início do próximo ou o fim do vídeo)
+    const totalDuration = parseFloat(document.getElementById('video-title').dataset.duration);
+    const url = urlInput.value.trim();
+    const id = document.getElementById('video-title').dataset.videoId;
+
+    parsed.forEach((item, index) => {
+        const nextStart = parsed[index + 1] ? parsed[index + 1].start : totalDuration;
+        // Só adiciona se o segmento tiver duração positiva
+        if (nextStart > item.start) {
+            downloadChapter(url, id, item.start, nextStart, item.title);
+        }
+    });
+
+    Notify.show("Bulk Iniciado", `${parsed.length} recortes adicionados à fila.`, "success");
+});
+
+function timeToSeconds(timeStr) {
+    const parts = timeStr.split(':').reverse();
+    let seconds = 0;
+    for (let i = 0; i < parts.length; i++) {
+        seconds += parseInt(parts[i]) * Math.pow(60, i);
+    }
+    return seconds;
 }
 
 function updateQueueCount() { queueCount.innerText = `${document.querySelectorAll('.queue-item').length} itens`; }

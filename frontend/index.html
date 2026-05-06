@@ -25,9 +25,54 @@
                 <a href="https://nexovibe.netlify.app/" target="_blank" class="brand-credit">by NexoVibe</a>
             </div>
             <div class="header-actions">
+                <button id="info-btn" class="control-btn" title="Como funciona?"><i class="fa-solid fa-circle-question"></i></button>
                 <button id="settings-btn" class="control-btn" title="Configurações"><i class="fa-solid fa-cog"></i></button>
             </div>
         </header>
+
+        <!-- Modal de Ajuda -->
+        <div id="help-modal" class="modal hidden">
+            <div class="modal-content glass help-content">
+                <button id="close-help-x" class="close-x-btn">&times;</button>
+                <h3><i class="fa-solid fa-circle-info"></i> Guia Rápido YouDown</h3>
+                
+                <div class="help-steps">
+                    <div class="step">
+                        <span class="step-num">1</span>
+                        <div class="step-text">
+                            <strong>Analisar</strong>
+                            <p>Cole o link do vídeo ou playlist e clique em "Analisar" para carregar as informações.</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <span class="step-num">2</span>
+                        <div class="step-text">
+                            <strong>Configurar</strong>
+                            <p>Escolha o formato (MP4/MP3). Se o vídeo tiver capítulos, você pode baixar trechos específicos usando o ícone <i class="fa-solid fa-scissors"></i>.</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <span class="step-num">3</span>
+                        <div class="step-text">
+                            <strong>Download</strong>
+                            <p>Clique em "Baixar Tudo" ou use as caixas de seleção na fila para processar múltiplos vídeos.</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <span class="step-num">4</span>
+                        <div class="step-text">
+                            <strong>Cookies (403 Forbidden)</strong>
+                            <p>Se um vídeo falhar, use o ícone de engrenagem para sincronizar cookies do seu navegador (Edge/Chrome).</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="help-footer">
+                    <p><i class="fa-solid fa-terminal"></i> Requisito: O <strong>FFmpeg</strong> deve estar instalado para a função de recortes.</p>
+                    <button id="close-help" class="btn-primary w-100">Entendido!</button>
+                </div>
+            </div>
+        </div>
 
         <!-- Modal de Cookies -->
         <div id="cookies-modal" class="modal hidden">
@@ -123,6 +168,30 @@
                         <div id="chapters-section" class="chapters-section hidden">
                             <h4><i class="fa-solid fa-bookmark"></i> Capítulos detetados (Baixar Recorte):</h4>
                             <div id="chapters-list" class="chapters-list"></div>
+                        </div>
+
+                        <!-- Recorte Personalizado -->
+                        <div id="custom-clip-section" class="chapters-section hidden">
+                            <h4><i class="fa-solid fa-scissors"></i> Recorte Personalizado (Manual):</h4>
+                            <div class="custom-clip-form">
+                                <div class="input-group-sm">
+                                    <label>Início (ex: 00:01:00)</label>
+                                    <input type="text" id="clip-start" placeholder="00:00:00">
+                                </div>
+                                <div class="input-group-sm">
+                                    <label>Fim (ex: 00:05:30)</label>
+                                    <input type="text" id="clip-end" placeholder="00:00:00">
+                                </div>
+                                <button id="btn-custom-cut" class="btn-primary btn-sm"><i class="fa-solid fa-download"></i> Recortar Trecho</button>
+                            </div>
+                        </div>
+
+                        <!-- Recorte em Lote (TOC) -->
+                        <div id="bulk-clip-section" class="chapters-section hidden">
+                            <h4><i class="fa-solid fa-list-check"></i> Recorte Automático via Índice (TOC):</h4>
+                            <p class="help-text-xs">Cole a lista de tempos (ex: 0:00 Aula 1) e o sistema criará todos os cortes.</p>
+                            <textarea id="toc-input" placeholder="Exemplo:&#10;(0:00) Introdução&#10;(15:30) Aula 2"></textarea>
+                            <button id="btn-process-toc" class="btn-primary btn-sm w-100"><i class="fa-solid fa-wand-magic-sparkles"></i> Processar Índice e Baixar Tudo</button>
                         </div>
 
                         <!-- Descrição Expansível -->

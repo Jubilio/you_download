@@ -247,14 +247,15 @@ def download_section():
             out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"%(title)s - {title}.%(ext)s")
             
             # Formata a seção para o yt-dlp (formato string robusto)
-            # Ex: "*00:00:00-00:10:00"
             def to_time(s):
                 h = int(s // 3600)
                 m = int((s % 3600) // 60)
                 s = int(s % 60)
                 return f"{h:02d}:{m:02d}:{s:02d}"
 
-            section_str = f"*{to_time(start)}-{to_time(end)}"
+            start_str = to_time(start)
+            end_str = to_time(end)
+            section_str = f"*{start_str}-{end_str}"
             
             ydl_opts = {
                 **get_common_opts(), 
@@ -263,9 +264,18 @@ def download_section():
                 'download_sections': [section_str],
                 'force_keyframes_at_cuts': True,
                 'nopart': True,
-                # Forçar o uso do ffmpeg para extrair apenas o fragmento necessário
-                # Isso evita baixar o vídeo inteiro se o servidor suportar
-                'concurrent_fragment_downloads': 5,
+                # --- CONFIGURAÇÃO PARA BAIXAR APENAS O TRECHO (FRAGMENTOS) ---
+                # Usamos o ffmpeg como downloader externo para permitir o seek direto no stream
+                'external_downloader': 'ffmpeg',
+                'external_downloader_args': {
+                    'ffmpeg': [
+                        '-ss', start_str,
+                        '-to', end_str,
+                        '-loglevel', 'info'
+                    ]
+                },
+                # Garante que ele não baixe o vídeo todo para depois cortar
+                'hls_use_mpegts': True, 
             }
             
             # Sobrescreve o progress_hook para usar o section_id
@@ -297,12 +307,18 @@ def get_all_progress():
 @app.route('/api/history', methods=['GET'])
 def get_history():
     files = []
+    allowed_exts = ('.mp4', '.mp3', '.webm', '.mkv', '.m4a') # Incluímos os mais comuns do YouTube
     if os.path.exists(DOWNLOAD_FOLDER):
         for root, dirs, filenames in os.walk(DOWNLOAD_FOLDER):
             for f in filenames:
-                if f == "downloaded_history.txt": continue
-                path = os.path.join(root, f); stats = os.stat(path)
-                files.append({'name': f, 'size': f"{stats.st_size / (1024*1024):.1f} MB", 'date': time.strftime('%d/%m/%Y', time.localtime(stats.st_mtime))})
+                if f.lower().endswith(allowed_exts):
+                    path = os.path.join(root, f)
+                    stats = os.stat(path)
+                    files.append({
+                        'name': f, 
+                        'size': f"{stats.st_size / (1024*1024):.1f} MB", 
+                        'date': time.strftime('%d/%m/%Y', time.localtime(stats.st_mtime))
+                    })
     return jsonify({'files': sorted(files, key=lambda x: x['date'], reverse=True), 'current_path': DOWNLOAD_FOLDER})
 
 @app.route('/api/select-folder', methods=['POST'])

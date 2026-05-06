@@ -48,6 +48,14 @@ header { margin-bottom: 30px; display: flex; justify-content: space-between; ali
 .modal-footer { display: flex; justify-content: flex-end; gap: 15px; }
 .logo i { font-size: 2rem; color: var(--primary); }
 .logo span { color: var(--primary); }
+.help-content { width: 550px !important; }
+.help-steps { margin: 25px 0; display: flex; flex-direction: column; gap: 15px; }
+.step { display: flex; gap: 15px; align-items: flex-start; }
+.step-num { background: var(--primary); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 800; flex-shrink: 0; }
+.step-text strong { display: block; font-size: 0.9rem; margin-bottom: 2px; }
+.step-text p { font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0; }
+.help-footer { margin-top: 20px; border-top: 1px solid var(--glass-border); padding-top: 15px; }
+.help-footer p { font-size: 0.75rem; color: var(--text-dim); margin-bottom: 15px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; }
 
 .dashboard-grid { display: grid; grid-template-columns: 1fr 380px; gap: 30px; }
 .glass { background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: 20px; padding: 25px; }
@@ -81,6 +89,14 @@ header { margin-bottom: 30px; display: flex; justify-content: space-between; ali
 .chapter-time { font-size: 0.75rem; color: var(--primary); font-family: monospace; }
 .btn-cut { background: var(--primary); border: none; color: white; padding: 5px 12px; border-radius: 6px; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: 0.2s; }
 .btn-cut:hover { background: var(--primary-hover); transform: scale(1.05); }
+
+.custom-clip-form { display: flex; align-items: flex-end; gap: 15px; margin-top: 10px; flex-wrap: wrap; }
+.input-group-sm { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 120px; }
+.input-group-sm label { font-size: 0.7rem; color: var(--text-dim); }
+.input-group-sm input { background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); border-radius: 8px; padding: 8px 12px; color: white; font-size: 0.85rem; }
+.btn-sm { padding: 8px 15px !important; font-size: 0.8rem !important; }
+#toc-input { width: 100%; height: 120px; background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); border-radius: 10px; color: white; padding: 10px; font-size: 0.8rem; font-family: monospace; margin: 10px 0; resize: vertical; }
+.help-text-xs { font-size: 0.7rem; color: var(--text-dim); margin-top: 5px; line-height: 1.4; }
 
 /* Descrição */
 .description-container { margin-top: 20px; }
