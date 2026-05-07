@@ -22,14 +22,18 @@
             </div>
 
             <nav class="nav-menu">
-                <a href="#" class="nav-item active" onclick="showSection('dashboard')"><i class="fa-solid fa-house"></i> <span>Dashboard</span></a>
-                <a href="#" class="nav-item" onclick="showSection('history')"><i class="fa-solid fa-history"></i> <span>Histórico</span></a>
-                <a href="#" class="nav-item" onclick="openSettings()"><i class="fa-solid fa-gear"></i> <span>Definições</span></a>
+                <a href="#dashboard" class="nav-item" id="nav-dashboard"><i class="fa-solid fa-house"></i> <span>Dashboard</span></a>
+                <a href="#history" class="nav-item" id="nav-history"><i class="fa-solid fa-history"></i> <span>Histórico</span></a>
+                <a href="#settings" class="nav-item" onclick="openSettings()"><i class="fa-solid fa-gear"></i> <span>Definições</span></a>
             </nav>
 
             <div class="engine-status">
-                <p style="font-size: 10px; color: #555; font-weight: bold;">ENGINE ROBUSTA v4</p>
-                <p style="font-size: 10px; color: #E50914;" id="socket-status">Desconectado</p>
+                <p style="font-size: 10px; color: #555; font-weight: bold; margin-bottom: 5px;">ENGINE ROBUSTA v4</p>
+                <p style="font-size: 10px; color: #E50914; margin-bottom: 15px;" id="socket-status">Desconectado</p>
+                
+                <a href="https://nexovibe.netlify.app/" target="_blank" class="brand-link">
+                    <i class="fa-solid fa-globe"></i> NexoVibe Official
+                </a>
             </div>
         </aside>
 

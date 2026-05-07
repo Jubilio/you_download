@@ -347,26 +347,47 @@ async function deleteHistoryItem(id) {
     }
 }
 
-// --- NAVIGATION & SETTINGS ---
+// --- NAVIGATION & ROUTING ---
+
+function handleRouting() {
+    const hash = window.location.hash || '#dashboard';
+    
+    if (hash === '#settings') {
+        openSettings();
+        // Manter a secção anterior visível por baixo do modal ou voltar para dashboard
+        if (document.getElementById('history-section').style.display === 'none') {
+            showSection('dashboard');
+        }
+        return;
+    }
+
+    const section = hash.replace('#', '');
+    showSection(section);
+}
 
 function showSection(section) {
     const dashboard = document.getElementById('dashboard-section');
     const history = document.getElementById('history-section');
-    const navItems = document.querySelectorAll('.nav-item');
+    const navDashboard = document.getElementById('nav-dashboard');
+    const navHistory = document.getElementById('nav-history');
 
-    navItems.forEach(item => item.classList.remove('active'));
+    // Reset
+    dashboard.style.display = 'none';
+    history.style.display = 'none';
+    navDashboard.classList.remove('active');
+    navHistory.classList.remove('active');
 
-    if (section === 'dashboard') {
-        dashboard.style.display = 'block';
-        history.style.display = 'none';
-        navItems[0].classList.add('active');
-    } else {
-        dashboard.style.display = 'none';
+    if (section === 'history') {
         history.style.display = 'block';
-        navItems[1].classList.add('active');
+        navHistory.classList.add('active');
         loadHistory();
+    } else {
+        dashboard.style.display = 'block';
+        navDashboard.classList.add('active');
     }
 }
+
+window.addEventListener('hashchange', handleRouting);
 
 function openSettings() {
     document.getElementById('settings-modal').style.display = 'flex';
@@ -377,6 +398,11 @@ function openSettings() {
 
 function closeSettings() {
     document.getElementById('settings-modal').style.display = 'none';
+    // Reset hash para a secção ativa sem disparar o handleRouting novamente de forma recursiva
+    const currentSection = document.getElementById('history-section').style.display === 'block' ? 'history' : 'dashboard';
+    if (window.location.hash === '#settings') {
+        history.replaceState(null, null, `#${currentSection}`);
+    }
 }
 
 async function syncCookies() {
@@ -495,4 +521,5 @@ async function uploadCookieFile(file) {
 }
 
 // Inicializar
+handleRouting();
 loadHistory();

@@ -92,6 +92,25 @@ body {
     font-weight: bold;
 }
 
+.brand-link {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 11px;
+    color: var(--text-dim);
+    text-decoration: none;
+    padding: 0.5rem 0.8rem;
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    transition: var(--transition-smooth);
+}
+
+.brand-link:hover {
+    color: white;
+    background: var(--glass-bg);
+    border-color: var(--netflix-red);
+}
+
 /* --- MAIN CONTENT --- */
 .main-content {
     flex: 1;
