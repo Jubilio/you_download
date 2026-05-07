@@ -65,6 +65,11 @@ os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 COOKIES_FILE = os.path.join(os.getcwd(), 'cookies.txt')
 ARCHIVE_FILE = os.path.join(os.getcwd(), 'downloaded_history.txt')
 NODE_PATH = r'C:\Program Files\nodejs\node.exe'
+# Adicionar diretório do Node ao PATH para que o yt-dlp o encontre automaticamente
+NODE_DIR = os.path.dirname(NODE_PATH)
+if os.path.exists(NODE_DIR) and NODE_DIR not in os.environ['PATH']:
+    os.environ['PATH'] = NODE_DIR + os.pathsep + os.environ['PATH']
+    print(f"[Engine] Node.js injetado no PATH: {NODE_DIR}")
 
 progress_store = {}
 cancelled_tasks = set()
@@ -156,12 +161,31 @@ def get_common_opts():
         'hls_prefer_native': True,
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         
-        # 🔥 Engine Robusta: Forçar MP4/M4A e evitar codecs pesados (AV1/VP9) por padrão
-        'format_sort': ['ext:mp4:m4a', 'res:1080', 'codec:h264:aac'],
-        'prefer_free_formats': False, # Preferimos MP4 (proprietário mas estável no player)
+        # 🔥 Configuração Ultra-Resiliente (2026)
+        'format': 'bv*+ba/b', # O mais compatível: tenta melhor vídeo+áudio, senão o melhor combo
+        'merge_output_format': 'mp4', # Garante que o resultado final é MP4
+        'quiet': False, # Deixamos logar para debug
+        'noplaylist': True,
         
-        # 🔥 JS Runtime (Fix para o erro detectado)
-        'javascript_runtime': NODE_PATH if os.path.exists(NODE_PATH) else 'node', 
+        # 🔥 Bypass & Resiliência
+        'nocheckcertificate': True,
+        'ignoreerrors': True,
+        'no_warnings': False,
+        
+        # 🔥 JS Runtime (Garantindo que o motor encontra o Node)
+        'javascript_runtime': 'node',
+        
+        # 🔥 Autenticação & Identidade
+        'cookiefile': COOKIES_FILE if os.path.exists(COOKIES_FILE) else None,
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        },
+
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['ios', 'web', 'android'],
+            }
+        },
         
         'http_headers': {
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -275,29 +299,32 @@ def get_info():
             
         print(f"[Analise] Processando URL: {url}")
         
-        # Opções MINIMALISTAS para análise (evita erro de formato não disponível)
-        ydl_opts = {
-            'quiet': True,
-            'no_warnings': True,
-            'format': 'best', # Força o melhor disponível sem filtros complexos
+        opts = get_common_opts()
+        opts.update({
             'extract_flat': 'in_playlist',
-            'ignoreerrors': True,
-            'noplaylist': True,
+            'noplaylist': False, # Permitir analisar playlists
             'extract_chapters': True,
-            'check_formats': False,
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
+        })
         
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(opts) as ydl:
             try:
                 info = ydl.extract_info(url, download=False)
             except Exception as e:
-                err_msg = str(e).split('\n')[0] # Pega apenas a primeira linha do erro
-                print(f"[Erro yt-dlp] {err_msg}")
-                return jsonify({'error': f'YouTube disse: {err_msg}'}), 400
+                error_msg = str(e)
+                user_friendly_error = "Erro ao analisar o link."
+                
+                if "confirm you're not a bot" in error_msg:
+                    user_friendly_error = "YouTube bloqueou o acesso (Bot). Cole os COOKIES nas definições."
+                elif "copyright claim" in error_msg.lower():
+                    user_friendly_error = "Vídeo removido por direitos de autor."
+                elif "Video unavailable" in error_msg:
+                    user_friendly_error = "Vídeo indisponível ou privado."
+                
+                print(f"[Análise Erro] {error_msg}")
+                return jsonify({'error': user_friendly_error}), 400
             
             if not info:
-                return jsonify({'error': 'Não foi possível obter dados. Tente sincronizar cookies ou usar outro link.'}), 400
+                return jsonify({'error': 'Não foi possível obter os dados do vídeo.'}), 400
                 
             # Se for playlist, garantir que processamos todas as entradas válidas
             entries = []
@@ -439,13 +466,24 @@ def download_single():
                     final_filename,
                     format_type
                 )
-            
             socketio.emit('progress', {'id': video_id, 'percent': 100, 'status': 'finished'})
         except DownloadCancelled:
             socketio.emit('progress', {'id': video_id, 'percent': 0, 'status': 'cancelled'})
         except Exception as e:
-            print(f"[Erro Download] {str(e)}")
-            socketio.emit('progress', {'id': video_id, 'percent': 0, 'status': 'error'})
+            error_msg = str(e)
+            user_friendly_error = "Erro no processamento."
+            
+            if "copyright claim" in error_msg.lower():
+                user_friendly_error = "Vídeo removido por direitos de autor (Copyright)."
+            elif "Requested format is not available" in error_msg:
+                user_friendly_error = "Formato indisponível. Tente MP3 ou atualize o motor."
+            elif "Sign in to confirm you’re not a bot" in error_msg:
+                user_friendly_error = "YouTube bloqueou o acesso (Bot). Use Cookies."
+            elif "Video unavailable" in error_msg:
+                user_friendly_error = "Vídeo indisponível ou privado."
+            
+            print(f"Download error: {error_msg}")
+            socketio.emit('progress', {'id': video_id, 'status': 'error', 'error': user_friendly_error})
         finally:
             if video_id in cancelled_tasks: cancelled_tasks.remove(video_id)
     

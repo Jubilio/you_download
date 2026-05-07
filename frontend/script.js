@@ -266,14 +266,43 @@ function updateTaskUI(data) {
     } else if (data.status === 'error') {
         fill.style.backgroundColor = '#ef4444';
         badge.innerText = 'ERRO';
+        
+        const errorMsg = data.error || "Falha no processamento.";
+        card.querySelector('.task-title').innerText = errorMsg;
+        card.querySelector('.task-title').style.color = '#ef4444';
+        logEvent(`ERROR: ${errorMsg}`);
     }
 }
 
+function showToast(title, msg, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast-item ${type}`;
+    
+    const icon = type === 'success' ? 'fa-circle-check' : (type === 'error' ? 'fa-circle-exclamation' : 'fa-bell');
+    
+    toast.innerHTML = `
+        <i class="fa-solid ${icon}" style="font-size: 1.2rem; margin-top: 0.2rem; color: ${type === 'success' ? '#4ade80' : (type === 'error' ? '#ef4444' : 'var(--netflix-red)')}"></i>
+        <div class="toast-content">
+            <h4>${title.toUpperCase()}</h4>
+            <p>${msg}</p>
+        </div>
+    `;
+    
+    container.appendChild(toast);
+    logEvent(`${title}: ${msg}`);
+
+    setTimeout(() => {
+        toast.style.animation = 'toastFadeOut 0.5s forwards';
+        setTimeout(() => toast.remove(), 500);
+    }, 4000);
+}
+
 function sendNotification(title, body) {
+    showToast(title, body, 'info');
+    // Manter a notificação do browser como secundária
     if (Notification.permission === 'granted') {
         new Notification(title, { body, icon: '/favicon.png' });
-    } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission();
     }
 }
 
@@ -491,10 +520,11 @@ async function selectFolder() {
         const res = await fetch('/api/select-folder', { method: 'POST' });
         const data = await res.json();
         if (data.success) {
+            showToast("Sucesso", "Pasta de downloads alterada.", "success");
             document.getElementById('current-folder-display').innerText = `Pasta atual: ${data.path}`;
         }
     } catch (err) {
-        console.error("Select folder error:", err);
+        showToast("Erro", "Não foi possível alterar a pasta.", "error");
     }
 }
 
@@ -509,9 +539,9 @@ async function updateEngine() {
     try {
         const res = await fetch('/api/update-engine', { method: 'POST' });
         const data = await res.json();
-        alert(data.message);
+        showToast("Motor", data.message, "success");
     } catch (err) {
-        alert("Erro ao atualizar motor.");
+        showToast("Erro", "Erro ao atualizar motor.", "error");
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-bolt"></i> Atualizar Motor';
@@ -635,7 +665,7 @@ async function uploadCookieFile(file) {
 function savePastedCookies() {
     const text = document.getElementById('cookie-paste-area').value;
     if (!text.trim()) {
-        alert("Por favor, cole o conteúdo dos cookies primeiro.");
+        showToast("Aviso", "Por favor, cole o conteúdo dos cookies primeiro.", "error");
         return;
     }
     submitCookies(text);
@@ -650,13 +680,13 @@ async function submitCookies(text) {
         });
         const data = await res.json();
         if (data.success) {
-            alert("Cookies guardados com sucesso!");
+            showToast("Cookies", "Cookies guardados com sucesso!", "success");
             document.getElementById('cookie-paste-area').value = '';
         } else {
-            alert("Erro ao salvar cookies.");
+            showToast("Erro", "Erro ao salvar cookies.", "error");
         }
     } catch (err) {
-        alert("Erro na conexão.");
+        showToast("Erro", "Erro na conexão.", "error");
     }
 }
 
