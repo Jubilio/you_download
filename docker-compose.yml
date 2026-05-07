@@ -1,14 +1,42 @@
 version: '3.8'
 
 services:
-  youdown:
-    build: .
-    container_name: youdown_nexovibe
+  redis:
+    image: redis:7-alpine
+    container_name: youdown_redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  api:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: youdown_api
     ports:
       - "5000:5000"
     volumes:
       - ./downloads:/app/downloads
+      - ./cookies.txt:/app/cookies.txt
     environment:
-      - FLASK_ENV=production
+      - REDIS_URL=redis://redis:6379/0
       - DOWNLOAD_PATH=/app/downloads
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  worker:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: youdown_worker
+    command: celery -A backend.app.tasks.worker worker --loglevel=info --concurrency=4
+    volumes:
+      - ./downloads:/app/downloads
+      - ./cookies.txt:/app/cookies.txt
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DOWNLOAD_PATH=/app/downloads
+    depends_on:
+      - redis
     restart: unless-stopped

@@ -1,0 +1,11 @@
+fastapi==0.110.0
+uvicorn==0.27.1
+python-socketio==5.11.1
+yt-dlp>=2024.3.10
+celery==5.3.6
+redis==5.0.3
+requests==2.31.0
+browser-cookie3==0.19.1
+python-dotenv==1.0.1
+sqlmodel==0.0.16
+aiofiles==23.2.1

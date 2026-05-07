@@ -161,29 +161,35 @@ def get_common_opts():
         'hls_prefer_native': True,
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         
-        # 🔥 Configuração Ultra-Resiliente (2026)
-        'format': 'bv*+ba/b', # O mais compatível: tenta melhor vídeo+áudio, senão o melhor combo
-        'merge_output_format': 'mp4', # Garante que o resultado final é MP4
-        'quiet': False, # Deixamos logar para debug
+        # 🔥 Configuração Ultra-Estável (Prioridade H264/MP4)
+        'format': 'bv*[vcodec^=avc1][ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b',
+        'merge_output_format': 'mp4',
+        'quiet': False,
         'noplaylist': True,
+        'retries': 10,
+        'fragment_retries': 10,
+        'concurrent_fragment_downloads': 1,
         
         # 🔥 Bypass & Resiliência
         'nocheckcertificate': True,
         'ignoreerrors': True,
         'no_warnings': False,
         
-        # 🔥 JS Runtime (Garantindo que o motor encontra o Node)
-        'javascript_runtime': 'node',
+        # 🔥 JS Runtime (Forçar o caminho absoluto para evitar falhas de detecção)
+        'javascript_runtime': NODE_PATH if os.path.exists(NODE_PATH) else 'node',
         
-        # 🔥 Autenticação & Identidade
+        # 🔥 Autenticação
         'cookiefile': COOKIES_FILE if os.path.exists(COOKIES_FILE) else None,
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        },
+
+        # 🔥 Opções de Robustez
+        'check_formats': False,
+        'youtube_include_dash_manifest': False,
+        'youtube_include_hls_manifest': False,
 
         'extractor_args': {
             'youtube': {
-                'player_client': ['ios', 'web', 'android'],
+                'player_client': ['web', 'ios', 'android'],
+                'player_skip': ['webpage', 'configs'], # Tenta saltar partes problemáticas
             }
         },
         
@@ -737,4 +743,5 @@ if __name__ == '__main__':
             webbrowser.open("http://127.0.0.1:5000/installer")
         Timer(2.5, open_browser).start()
         
-    socketio.run(app, debug=not is_frozen, host=host_addr, port=5000)
+    # Desativar debug para evitar que o Flask reinicie e mate as tarefas de download
+    socketio.run(app, debug=False, host=host_addr, port=5000)

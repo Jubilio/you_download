@@ -1,33 +1,37 @@
-# Use a imagem oficial do Python
+# Use Python official image
 FROM python:3.11-slim
 
-# Evita que o Python gere arquivos .pyc e permite logs em tempo real
+# Environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
+ENV PYTHONPATH=/app
 
-# Instalar dependências do sistema (FFmpeg é essencial)
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     curl \
+    gnupg \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Definir diretório de trabalho
+# Set working directory
 WORKDIR /app
 
-# Copiar apenas os requisitos primeiro para aproveitar o cache do Docker
-COPY requirements.txt .
+# Copy requirements and install
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar o restante do código do projeto
-COPY . .
+# Copy backend code
+COPY backend /app/backend
+COPY cookies.txt /app/cookies.txt
 
-# Criar pasta de downloads e garantir permissões
+# Create downloads folder
 RUN mkdir -p /app/downloads && chmod 777 /app/downloads
 
-# Expor a porta que o Flask usa
+# Expose port
 EXPOSE 5000
 
-# Comando para rodar a aplicação
-# Usamos o host 0.0.0.0 para que o container seja acessível externamente
-CMD ["python", "app.py"]
+# Entry point
+CMD ["python", "-m", "backend.app.main"]
