@@ -1,288 +1,199 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouDown | Manager</title>
+    <title>YouDown Pro | Netflix Edition</title>
+    <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
-    <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="background-animation">
-        <div class="circle"></div>
-        <div class="circle"></div>
-    </div>
-
     <div class="app-container">
-        <header>
+        <!-- Sidebar -->
+        <aside class="sidebar">
             <div class="logo">
-                <i class="fa-solid fa-cloud-arrow-down"></i>
-                <h1>You<span>Down</span></h1>
-                <a href="https://nexovibe.netlify.app/" target="_blank" class="brand-credit">by NexoVibe</a>
+                <div class="logo-box">
+                    <i class="fa-solid fa-download"></i>
+                </div>
+                <h1>YOU<span>DOWN</span></h1>
             </div>
-            <div class="header-actions">
-                <button id="info-btn" class="control-btn" title="Como funciona?"><i class="fa-solid fa-brain"></i></button>
-                <button id="settings-btn" class="control-btn" title="Configurações"><i class="fa-solid fa-microchip"></i></button>
+
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active" onclick="showSection('dashboard')"><i class="fa-solid fa-house"></i> <span>Dashboard</span></a>
+                <a href="#" class="nav-item" onclick="showSection('history')"><i class="fa-solid fa-history"></i> <span>Histórico</span></a>
+                <a href="#" class="nav-item" onclick="openSettings()"><i class="fa-solid fa-gear"></i> <span>Definições</span></a>
+            </nav>
+
+            <div class="engine-status">
+                <p style="font-size: 10px; color: #555; font-weight: bold;">ENGINE ROBUSTA v4</p>
+                <p style="font-size: 10px; color: #E50914;" id="socket-status">Desconectado</p>
             </div>
-        </header>
+        </aside>
 
-        <!-- Modal de Ajuda -->
-        <div id="help-modal" class="modal hidden">
-            <div class="modal-content glass help-content">
-                <button id="close-help-x" class="close-x-btn">&times;</button>
-                <h3><i class="fa-solid fa-circle-info"></i> Guia Rápido YouDown</h3>
-                
-                <div class="help-steps">
-                    <div class="step">
-                        <span class="step-num">1</span>
-                        <div class="step-text">
-                            <strong>Analisar</strong>
-                            <p>Cole o link do vídeo ou playlist e clique em "Analisar" para carregar as informações.</p>
-                        </div>
-                    </div>
-                    <div class="step">
-                        <span class="step-num">2</span>
-                        <div class="step-text">
-                            <strong>Configurar</strong>
-                            <p>Escolha o formato (MP4/MP3). Se o vídeo tiver capítulos, você pode baixar trechos específicos usando o ícone <i class="fa-solid fa-scissors"></i>.</p>
-                        </div>
-                    </div>
-                    <div class="step">
-                        <span class="step-num">3</span>
-                        <div class="step-text">
-                            <strong>Download</strong>
-                            <p>Clique em "Baixar Tudo" ou use as caixas de seleção na fila para processar múltiplos vídeos.</p>
-                        </div>
-                    </div>
-                    <div class="step">
-                        <span class="step-num">4</span>
-                        <div class="step-text">
-                            <strong>Cookies (403 Forbidden)</strong>
-                            <p>Se um vídeo falhar, use o ícone de engrenagem para sincronizar cookies do seu navegador (Edge/Chrome).</p>
-                        </div>
-                    </div>
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header-search">
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" id="video-url" placeholder="Cole o link do YouTube aqui e prima Enter...">
                 </div>
+            </header>
 
-                <div class="help-footer">
-                    <p><i class="fa-solid fa-terminal"></i> Requisito: O <strong>FFmpeg</strong> deve estar instalado para a função de recortes.</p>
-                    <button id="close-help" class="btn-primary w-100">Entendido!</button>
-                </div>
-            </div>
-        </div>
+            <div id="dashboard-section">
 
-        <!-- Modal de Cookies -->
-        <div id="cookies-modal" class="modal hidden">
-            <div class="modal-content glass">
-                <button id="close-modal-x" class="close-x-btn">&times;</button>
-                <h3><i class="fa-solid fa-cookie-bite"></i> Autenticação (Cookies)</h3>
-                <p>Para baixar vídeos restritos ou playlists longas, precisamos que o YouDown "pense" que é você no navegador.</p>
-                
-                <div class="sync-methods">
-                    <button id="sync-cookies-btn" class="btn-success w-100"><i class="fa-solid fa-sync"></i> Tentativa Automática (Feche o Browser)</button>
-                    
-                    <div class="divider"><span>OU MÉTODO MANUAL</span></div>
-                    
-                    <div class="manual-guide">
-                        <ol>
-                            <li>Instale a extensão <a href="https://chrome.google.com/webstore/detail/get-cookiestxt-locally/ccmclabimipke%E6%8A%BD%E7%8D%8E%E6%8A%BD%E7%8D%8Emjjnldpcclebedia" target="_blank">Get cookies.txt</a></li>
-                            <li>No YouTube, clique na extensão e <b>copie o conteúdo</b>.</li>
-                            <li>Cole no campo abaixo ou <b>arraste o ficheiro</b> aqui.</li>
-                        </ol>
+
+            <!-- Hero Preview (Netflix Style) -->
+            <section id="hero-preview" class="hero-preview">
+                <img id="hero-img" src="" class="hero-img" alt="">
+                <div class="hero-overlay">
+                    <div class="hero-badge">Original YouDown</div>
+                    <h2 id="hero-title" class="hero-title">Título do Vídeo</h2>
+                    <p id="hero-channel" style="color: #b3b3b3; margin-bottom: 1.5rem;">Canal do YouTube</p>
+                    <div id="hero-actions" class="hero-actions">
+                        <button class="btn btn-primary" onclick="startDownload('mp4')">
+                            <i class="fa-solid fa-play"></i> Baixar Vídeo
+                        </button>
+                        <button class="btn btn-secondary" onclick="startDownload('mp3')">
+                            <i class="fa-solid fa-music"></i> Baixar Áudio
+                        </button>
+                        <button class="btn btn-secondary" onclick="toggleManualCut()">
+                            <i class="fa-solid fa-scissors"></i> Recorte Manual
+                        </button>
                     </div>
 
-                    <div id="drop-zone" class="drop-zone">
-                        <i class="fa-solid fa-file-import"></i>
-                        <p>Cole o texto aqui ou arraste o cookies.txt</p>
-                        <textarea id="cookies-input" placeholder="Netscape HTTP Cookie File..."></textarea>
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button id="update-engine-btn" class="btn-text-only" title="Atualizar o motor de download (yt-dlp)"><i class="fa-solid fa-sync"></i> Atualizar Motor</button>
-                    <button id="close-modal" class="btn-secondary">Cancelar</button>
-                    <button id="save-cookies-btn" class="btn-primary">Salvar Cookies</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Modal de Player -->
-        <div id="player-modal" class="modal hidden">
-            <div class="modal-content glass player-content">
-                <button id="close-player-x" class="close-x-btn">&times;</button>
-                <h3 id="player-title">Reproduzir Mídia</h3>
-                <div class="media-container">
-                    <video id="video-player" controls class="w-100"></video>
-                    <audio id="audio-player" controls class="w-100 hidden"></audio>
-                </div>
-                <div class="modal-footer">
-                    <button id="close-player" class="btn-text-only">Fechar</button>
-                    <a id="download-player-btn" href="" download class="btn-primary"><i class="fa-solid fa-download"></i> Descarregar</a>
-                </div>
-            </div>
-        </div>
-
-        <main class="dashboard-grid">
-            <section class="main-column">
-                <!-- Entrada de URL -->
-                <div class="main-card glass">
-                    <div class="input-group">
-                        <div class="input-wrapper">
-                            <i class="fa-solid fa-satellite"></i>
-                            <input type="url" id="url-input" placeholder="Cole o link do vídeo ou playlist aqui...">
+                    <!-- Painel de Recorte Manual (Oculto por padrão) -->
+                    <div id="manual-cut-panel" class="manual-cut-panel" style="display: none;">
+                        <div class="input-group">
+                            <label>Início</label>
+                            <input type="text" id="cut-start" placeholder="00:00:00" value="00:00:00">
                         </div>
-                        <button id="fetch-btn" class="btn-primary">Analisar</button>
-                    </div>
-
-                    <div id="loader" class="loader-container hidden">
-                        <div class="spinner"></div>
-                        <p>Extraindo informações...</p>
-                    </div>
-
-                    <!-- Preview e Botão Global -->
-                    <div id="preview-section" class="preview-card hidden">
-                        <div class="video-info-wrapper">
-                            <img id="video-thumbnail" src="" alt="Thumbnail">
-                            <div class="video-details">
-                                <h2 id="video-title">Título</h2>
-                                <p id="video-channel">Canal</p>
-                                <div class="download-controls">
-                                    <select id="format-select">
-                                        <option value="mp4">Vídeo MP4</option>
-                                        <option value="mp3">Áudio MP3</option>
-                                    </select>
-                                    <button id="download-all-btn" class="btn-success">Baixar Tudo</button>
-                                </div>
-                            </div>
+                        <div class="input-group">
+                            <label>Fim</label>
+                            <input type="text" id="cut-end" placeholder="00:00:00" value="00:00:10">
                         </div>
-
-                        <!-- Nova secção de Recursos Extras -->
-                        <div id="resources-section" class="resources-section hidden">
-                            <h4><i class="fa-solid fa-paperclip"></i> Materiais Extras Detetados:</h4>
-                            <div id="resources-list" class="resources-list"></div>
+                        <div class="input-group">
+                            <label>Nome</label>
+                            <input type="text" id="cut-name" placeholder="Nome do corte..." value="Meu Recorte">
                         </div>
-
-                        <!-- Nova secção de Capítulos -->
-                        <div id="chapters-section" class="chapters-section hidden">
-                            <h4><i class="fa-solid fa-bookmark"></i> Capítulos detetados (Baixar Recorte):</h4>
-                            <div id="chapters-list" class="chapters-list"></div>
-                        </div>
-
-                        <!-- Recorte Personalizado -->
-                        <div id="custom-clip-section" class="chapters-section hidden">
-                            <h4><i class="fa-solid fa-scissors"></i> Recorte Personalizado (Manual):</h4>
-                            <div class="custom-clip-form">
-                                <div class="input-group-sm">
-                                    <label>Início (ex: 00:01:00)</label>
-                                    <input type="text" id="clip-start" placeholder="00:00:00">
-                                </div>
-                                <div class="input-group-sm">
-                                    <label>Fim (ex: 00:05:30)</label>
-                                    <input type="text" id="clip-end" placeholder="00:00:00">
-                                </div>
-                                <button id="btn-custom-cut" class="btn-primary btn-sm"><i class="fa-solid fa-download"></i> Recortar Trecho</button>
-                            </div>
-                        </div>
-
-                        <!-- Recorte em Lote (TOC) -->
-                        <div id="bulk-clip-section" class="chapters-section hidden">
-                            <h4><i class="fa-solid fa-list-check"></i> Recorte Automático via Índice (TOC):</h4>
-                            <p class="help-text-xs">Cole a lista de tempos (ex: 0:00 Aula 1) e o sistema criará todos os cortes.</p>
-                            <textarea id="toc-input" placeholder="Exemplo:&#10;(0:00) Introdução&#10;(15:30) Aula 2"></textarea>
-                            <button id="btn-process-toc" class="btn-primary btn-sm w-100"><i class="fa-solid fa-wand-magic-sparkles"></i> Processar Índice e Baixar Tudo</button>
-                        </div>
-
-                        <!-- Descrição Expansível -->
-                        <div class="description-container">
-                            <div class="desc-header">
-                                <button id="toggle-desc" class="btn-text-only">Ver Descrição Completa <i class="fa-solid fa-chevron-down"></i></button>
-                                <button id="download-desc-btn" class="btn-text-only" title="Descarregar descrição como .txt"><i class="fa-solid fa-file-export"></i> Baixar Texto</button>
-                            </div>
-                            <pre id="video-description" class="hidden"></pre>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Fila de Downloads Ativos -->
-                <div class="queue-section">
-                    <div class="section-header">
-                        <div class="header-left">
-                            <h3><i class="fa-solid fa-list-check"></i> Fila de Downloads</h3>
-                            <span id="queue-count">0 itens</span>
-                        </div>
-                        <div class="header-actions">
-                            <label class="select-all-wrapper">
-                                <input type="checkbox" id="select-all-checkbox">
-                                <span>Selecionar Tudo</span>
-                            </label>
-                            <button id="download-selected-btn" class="btn-success btn-sm">Baixar Selecionados</button>
-                        </div>
-                    </div>
-                    <div id="download-queue" class="download-grid">
-                        <!-- Cards dinâmicos entrarão aqui -->
+                        <button class="btn btn-primary" onclick="processManualCut()">
+                            <i class="fa-solid fa-cut"></i> Iniciar Recorte
+                        </button>
                     </div>
                 </div>
             </section>
 
-            <!-- Sidebar -->
-            <aside class="side-column">
-                <div class="side-card glass">
-                    <div class="side-header">
-                        <div class="sidebar-header">
-                            <h3><i class="fa-solid fa-history"></i> Concluídos</h3>
-                            <div class="search-box">
-                                <i class="fa-solid fa-magnifying-glass"></i>
-                                <input type="text" id="history-search" placeholder="Pesquisar ficheiro...">
-                            </div>
-                        </div>
-                        <div class="side-actions">
-                            <button id="open-folder-btn" title="Abrir pasta"><i class="fa-solid fa-folder-tree"></i></button>
-                            <button id="refresh-history" title="Atualizar"><i class="fa-solid fa-arrows-rotate"></i></button>
-                            <button id="clear-history-btn" class="btn-danger-icon" title="Limpar Histórico"><i class="fa-solid fa-fire"></i></button>
-                        </div>
-                    </div>
-                    <div class="path-config">
-                        <p><i class="fa-solid fa-location-dot"></i> A salvar em:</p>
-                        <div class="path-display">
-                            <span id="current-path">...</span>
-                            <button id="change-folder-btn"><i class="fa-solid fa-pen"></i></button>
-                        </div>
-                    </div>
-                    <div id="history-list" class="history-list"></div>
+            <!-- Chapters Section -->
+            <section id="chapters-section" style="display: none; margin-bottom: 3rem;">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-bookmark" style="color: #E50914;"></i> Cenas Detetadas</h2>
                 </div>
-            </aside>
+                <div id="chapters-list" class="chapters-grid">
+                    <!-- Chapters injected by JS -->
+                </div>
+            </section>
+
+            <!-- Playlist Section -->
+            <section id="playlist-section" style="display: none; margin-bottom: 3rem;">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-list-ul"></i> Vídeos da Playlist</h2>
+                </div>
+                <div id="playlist-grid" class="playlist-grid">
+                    <!-- Playlist videos injected by JS -->
+                </div>
+            </section>
+
+            <!-- Active Downloads Grid -->
+            <section class="tasks-section">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-download" style="color: #E50914;"></i> Downloads Ativos</h2>
+                    <span id="active-count" style="font-size: 0.8rem; color: #555;">0 tarefas</span>
+                </div>
+                <div id="task-grid" class="task-grid">
+                    <!-- Tasks injected by JS -->
+                </div>
+            </section>
+            </div>
+
+
+            <!-- History Section -->
+            <section id="history-section" class="history-section" style="display: none;">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-clock-rotate-left"></i> Histórico de Downloads</h2>
+                    <div style="display: flex; gap: 1rem;">
+                        <input type="text" id="history-search" placeholder="Pesquisar..." class="input-netflix" style="padding: 0.4rem 1rem; font-size: 0.8rem; width: 200px;">
+                        <button class="btn btn-secondary btn-small" onclick="clearHistory()" style="color: #ef4444;">
+                            <i class="fa-solid fa-trash"></i> Limpar
+                        </button>
+                    </div>
+                </div>
+                <div id="history-grid" class="history-grid">
+                    <!-- History injected by JS -->
+                </div>
+            </section>
         </main>
-        
-        <footer>
-            <p>© 2026 YouDown Premium Dashboard. Engineered by <a href="https://nexovibe.netlify.app/" target="_blank">NexoVibe</a></p>
-        </footer>
     </div>
 
-    <div class="bg-glow"></div>
-    <div id="ambient-overlay"></div>
-    
-    <audio id="notify-sound" preload="auto">
-        <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
-    </audio>
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-gear"></i> Definições do Sistema</h3>
+                <button class="close-btn" onclick="closeSettings()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-group">
+                    <h4><i class="fa-solid fa-cookie-bite"></i> Autenticação (YouTube)</h4>
+                    <p>Sincronize com o seu navegador para aceder a conteúdos restritos.</p>
+                    
+                    <div class="sync-actions">
+                        <button class="btn btn-primary btn-full" onclick="syncCookies()">
+                            <i class="fa-solid fa-sync"></i> Sincronização Automática
+                        </button>
+                        <p style="font-size: 10px; color: #777; margin-top: 5px;">Nota: Pode exigir permissões de Administrador.</p>
+                    </div>
 
-    <div id="notification-container" class="notification-container"></div>
+                    <div class="cookie-upload-zone" id="cookie-drop-zone">
+                        <i class="fa-solid fa-file-import"></i>
+                        <span>Ou arraste o seu <b>cookies.txt</b> aqui</span>
+                        <input type="file" id="cookie-file-input" style="display: none;" onchange="handleCookieUpload(event)">
+                    </div>
+                </div>
 
-    <div id="confirm-overlay" class="modal-overlay">
-        <div class="confirm-dialog">
-            <div class="confirm-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
-            <h3 id="confirm-title">Confirmar Ação</h3>
-            <p id="confirm-text">Deseja realmente prosseguir?</p>
-            <div class="confirm-buttons">
-                <button id="confirm-cancel" class="btn-cancel">Cancelar</button>
-                <button id="confirm-ok" class="btn-confirm-action">Confirmar</button>
+                <div class="settings-group">
+                    <h4><i class="fa-solid fa-folder-open"></i> Pasta de Downloads</h4>
+                    <p id="current-folder-display">Pasta atual: Carregando...</p>
+                    <div style="display: flex; gap: 1rem;">
+                        <button class="btn btn-secondary btn-full" onclick="selectFolder()">
+                            <i class="fa-solid fa-folder-tree"></i> Alterar Pasta
+                        </button>
+                        <button class="btn btn-secondary" onclick="openFolder()">
+                            <i class="fa-solid fa-external-link"></i> Abrir
+                        </button>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h4><i class="fa-solid fa-microchip"></i> Motor yt-dlp</h4>
+                    <p>Mantenha o motor de download atualizado para evitar erros.</p>
+                    <button class="btn btn-secondary btn-full" onclick="updateEngine()">
+                        <i class="fa-solid fa-bolt"></i> Atualizar Motor
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+    <!-- Modais / Recortes (Opcional se necessário) -->
+    <div id="cut-modal" style="display: none;">
+        <!-- Lógica de recorte virá aqui -->
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

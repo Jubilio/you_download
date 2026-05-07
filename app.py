@@ -135,14 +135,14 @@ def make_progress_hook(task_id):
     return hook
 
 def get_common_opts():
-    """Opções base otimizadas para estabilidade e performance."""
+    """Opções base de nível industrial para estabilidade máxima."""
     opts = {
         'ignoreconfig': True,
         'no_warnings': True,
         'download_archive': ARCHIVE_FILE,
         'concurrent_fragment_downloads': 2,
-        'fragment_retries': 15,
-        'retries': 15,
+        'fragment_retries': 20,
+        'retries': 20,
         'file_access_retries': 5,
         'socket_timeout': 60,
         'ignoreerrors': True,
@@ -150,6 +150,14 @@ def get_common_opts():
         'geo_bypass': True,
         'hls_prefer_native': True,
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        
+        # 🔥 Engine Robusta: Forçar MP4/M4A e evitar codecs pesados (AV1/VP9) por padrão
+        'format_sort': ['ext:mp4:m4a', 'res:1080', 'codec:h264:aac'],
+        'prefer_free_formats': False, # Preferimos MP4 (proprietário mas estável no player)
+        
+        # 🔥 JS Runtime (Fix para o erro detectado)
+        'javascript_runtime': NODE_PATH if os.path.exists(NODE_PATH) else 'node', 
+        
         'http_headers': {
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'en-us,en;q=0.5',
@@ -379,8 +387,9 @@ def download_single():
             subfolder = f"{playlist_title}/" if playlist_title else ""
             out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"{subfolder}%(playlist_index&{{:02d}} - |)s%(title)s.%(ext)s")
             
-            # Estratégia de formato: Priorizar MP4 para vídeo e M4A (AAC) para áudio para máxima compatibilidade no navegador
-            format_str = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best' if format_type == 'mp4' else 'bestaudio/best'
+            # Engine Robusta Definitiva: bv*[ext=mp4]+ba[ext=m4a]/b
+            # Prioriza H.264 e AAC para compatibilidade total
+            format_str = 'bv*[ext=mp4]+ba[ext=m4a]/b' if format_type == 'mp4' else 'ba/b'
             
             ydl_opts = {
                 **get_common_opts(), 
@@ -390,7 +399,10 @@ def download_single():
                 'nopart': True, 
                 'restrictfilenames': True,
                 'progress_hooks': [make_progress_hook(video_id)],
-                'logger': YDLProgressLogger(video_id)
+                'logger': YDLProgressLogger(video_id),
+                'postprocessor_args': {
+                    'merger': ['-c:a', 'aac'] if format_type == 'mp4' else []
+                }
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
@@ -471,17 +483,11 @@ def download_section():
             socketio.emit('progress', {'id': section_id, 'percent': 0, 'status': 'starting'})
             out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"%(title)s - {title}.%(ext)s")
             
-            # --- ESTRATÉGIA ROBUSTA ---
-            # Tentamos primeiro o melhor formato. Se falhar, o fallback será ativado.
-            # O uso de download_ranges nativo com lambda é mais estável.
-            
-            # Priorizar MP4/M4A para compatibilidade no Player
-            format_str = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
-            
+            # Engine Robusta Definitiva: bv*[ext=mp4]+ba[ext=m4a]/b
             ydl_opts = {
                 **get_common_opts(), 
                 'download_archive': None, 
-                'format': format_str, 
+                'format': 'bv*[ext=mp4]+ba[ext=m4a]/b', 
                 'outtmpl': out_tmpl, 
                 'merge_output_format': 'mp4',
                 'force_keyframes_at_cuts': True,
@@ -492,34 +498,33 @@ def download_section():
                 }],
                 'progress_hooks': [make_progress_hook(section_id)],
                 'logger': YDLProgressLogger(section_id),
+                'postprocessor_args': {
+                    'merger': ['-c:a', 'aac'] 
+                }
             }
             
-            try:
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(url, download=True)
-            except Exception as e:
-                print(f"[Fallback] Erro no formato complexo, tentando best[ext=mp4]: {str(e)}")
-                ydl_opts['format'] = 'best[ext=mp4]'
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(url, download=True)
-
-            if not info:
-                raise Exception("Vídeo não disponível após múltiplas tentativas.")
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                # Usar download() em vez de extract_info para disparar o processo de forma mais isolada
+                ydl.download([url])
+                # Precisamos dos metadados para o DB, então fazemos um extract rápido sem download
+                info = ydl.extract_info(url, download=False)
+                if not info:
+                    raise Exception("Erro ao processar vídeo (retornou vazio).")
+                    
+                final_filename = ydl.prepare_filename(info)
+                if not final_filename.endswith('.mp4'):
+                    final_filename = os.path.splitext(final_filename)[0] + '.mp4'
                 
-            final_filename = ydl.prepare_filename(info)
-            if not final_filename.endswith('.mp4'):
-                final_filename = os.path.splitext(final_filename)[0] + '.mp4'
-            
-            # Salvar no DB
-            add_to_history_db(
-                section_id, 
-                f"{info.get('title', 'Vídeo')} (Corte: {title})", 
-                info.get('uploader', 'Canal'), 
-                info.get('thumbnail', ''),
-                os.path.basename(final_filename),
-                final_filename,
-                'mp4'
-            )
+                # Salvar no DB
+                add_to_history_db(
+                    section_id, 
+                    f"{info.get('title', 'Vídeo')} (Corte: {title})", 
+                    info.get('uploader', 'Canal'), 
+                    info.get('thumbnail', ''),
+                    os.path.basename(final_filename),
+                    final_filename,
+                    'mp4'
+                )
             
             socketio.emit('progress', {'id': section_id, 'percent': 100, 'status': 'finished'})
         except DownloadCancelled:
