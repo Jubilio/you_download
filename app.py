@@ -40,11 +40,16 @@ def init_db():
 
 init_db()
 
-def get_static_path():
+def get_resource_path(relative_path):
+    """Retorna o caminho absoluto para recursos, funcionando em dev e em exe (PyInstaller)."""
     if getattr(sys, 'frozen', False):
-        # Caminho quando empacotado pelo PyInstaller
-        return os.path.join(sys._MEIPASS, 'frontend')
-    return 'frontend'
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+def get_static_path():
+    return get_resource_path('frontend')
 
 app = Flask(__name__, static_folder=get_static_path(), static_url_path='')
 CORS(app)
@@ -384,7 +389,15 @@ def download_single():
     def run_download():
         try:
             socketio.emit('progress', {'id': video_id, 'percent': 0, 'status': 'starting'})
-            subfolder = f"{playlist_title}/" if playlist_title else ""
+            
+            # Sanitização e criação de subpasta para playlists
+            subfolder = ""
+            if playlist_title:
+                # Remove caracteres inválidos para pastas no Windows
+                clean_title = re.sub(r'[\\/*?:"<>|]', "", playlist_title).strip()
+                subfolder = f"{clean_title}/"
+                os.makedirs(os.path.join(DOWNLOAD_FOLDER, clean_title), exist_ok=True)
+
             out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"{subfolder}%(playlist_index&{{:02d}} - |)s%(title)s.%(ext)s")
             
             # Engine Robusta Definitiva: bv*[ext=mp4]+ba[ext=m4a]/b
@@ -461,7 +474,7 @@ def install_ffmpeg():
 
 @app.route('/installer')
 def installer():
-    return send_file('installer.html')
+    return send_file(get_resource_path('installer.html'))
 
 @app.route('/api/download-section', methods=['POST'])
 def download_section():

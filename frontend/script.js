@@ -16,11 +16,13 @@ let currentVideoInfo = null;
 socket.on('connect', () => {
     socketStatus.innerText = 'Conectado';
     socketStatus.style.color = '#4ade80';
+    logEvent("Socket Pipeline Established. Signal Strength: 100%");
 });
 
 socket.on('disconnect', () => {
     socketStatus.innerText = 'Desconectado';
     socketStatus.style.color = '#E50914';
+    logEvent("CRITICAL: Socket Signal Lost. Retrying...");
 });
 
 socket.on('progress', (data) => {
@@ -108,18 +110,27 @@ function renderPlaylist(entries) {
     const grid = document.getElementById('playlist-grid');
     section.style.display = 'block';
     grid.innerHTML = '';
+    
+    // Armazenar para uso no download selecionado
+    currentVideoInfo.entries = entries;
 
-    entries.forEach(item => {
+    entries.forEach((item, index) => {
         const card = document.createElement('div');
         card.className = 'playlist-item';
         card.innerHTML = `
-            <div class="thumb-wrapper">
-                <img src="${item.thumbnail}" alt="">
+            <div style="display: flex; align-items: center; gap: 1rem; width: 100%;">
+                <input type="checkbox" class="playlist-checkbox" data-index="${index}" checked style="width: 20px; height: 20px; accent-color: var(--netflix-red); cursor: pointer;">
+                <div class="thumb-wrapper" style="width: 100px; min-width: 100px;">
+                    <img src="${item.thumbnail}" alt="" style="width: 100px;">
+                </div>
+                <div class="playlist-info" style="flex: 1;">
+                    <div class="chapter-title" style="font-size: 0.9rem; margin-bottom: 5px;">${item.title}</div>
+                    <div style="font-size: 0.7rem; color: #777;">${item.channel || ''}</div>
+                </div>
+                <button class="btn btn-secondary btn-small" onclick="analyzeVideoUrl('${item.url}')" title="Analisar este vídeo individualmente">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </button>
             </div>
-            <div class="chapter-title" style="font-size: 0.8rem;">${item.title}</div>
-            <button class="btn btn-secondary btn-small" onclick="analyzeVideoUrl('${item.url}')">
-                <i class="fa-solid fa-magnifying-glass"></i> Analisar
-            </button>
         `;
         grid.appendChild(card);
     });
@@ -174,6 +185,54 @@ async function startDownload(format = 'mp4') {
     } catch (err) {
         console.error("Download fail:", err);
     }
+}
+
+async function downloadPlaylist() {
+    if (!currentVideoInfo || !currentVideoInfo.entries) return;
+    
+    // Obter índices selecionados
+    const checkboxes = document.querySelectorAll('.playlist-checkbox');
+    const selectedIndices = Array.from(checkboxes)
+        .filter(cb => cb.checked)
+        .map(cb => parseInt(cb.dataset.index));
+
+    if (selectedIndices.length === 0) {
+        alert("Por favor, selecione pelo menos um vídeo para baixar.");
+        return;
+    }
+
+    const playlistTitle = currentVideoInfo.title || "Playlist";
+    sendNotification("Playlist Iniciada", `A processar ${selectedIndices.length} vídeos selecionados...`);
+    logEvent(`Starting selective playlist download: ${selectedIndices.length} items.`);
+
+    for (const index of selectedIndices) {
+        const entry = currentVideoInfo.entries[index];
+        try {
+            await fetch('/api/download-single', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    url: entry.url,
+                    id: entry.id,
+                    format: 'mp4',
+                    title: entry.title,
+                    thumbnail: entry.thumbnail,
+                    channel: entry.channel,
+                    playlist_title: playlistTitle
+                })
+            });
+        } catch (err) {
+            console.error("Playlist item download fail:", err);
+            logEvent(`ERROR: Failed to queue ${entry.title}`);
+        }
+    }
+}
+
+function togglePlaylistSelection() {
+    const checkboxes = document.querySelectorAll('.playlist-checkbox');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    checkboxes.forEach(cb => cb.checked = !allChecked);
+    logEvent(allChecked ? "All items deselected." : "All items selected.");
 }
 
 function updateTaskUI(data) {
@@ -459,6 +518,73 @@ async function updateEngine() {
     }
 }
 
+// --- VIDEO DETAILS & RESOURCES ---
+
+function showVideoDetails() {
+    if (!currentVideoInfo) return;
+    
+    const modal = document.getElementById('details-modal');
+    const desc = document.getElementById('video-description');
+    const resSection = document.getElementById('resources-section');
+    const resList = document.getElementById('resources-list');
+    
+    desc.innerText = currentVideoInfo.description || "Sem descrição disponível.";
+    
+    // Extração de recursos (Links Úteis)
+    const links = extractResources(currentVideoInfo.description || "");
+    
+    if (links.length > 0) {
+        resSection.style.display = 'block';
+        resList.innerHTML = '';
+        links.forEach(link => {
+            const item = document.createElement('div');
+            item.className = 'playlist-item';
+            item.style.flexDirection = 'row';
+            item.style.justifyContent = 'space-between';
+            item.style.alignItems = 'center';
+            item.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <i class="${link.icon}" style="color: var(--primary); font-size: 1.2rem;"></i>
+                    <span style="font-size: 0.9rem; font-weight: bold;">${link.type}</span>
+                </div>
+                <a href="${link.url}" target="_blank" class="btn btn-secondary btn-small">
+                    <i class="fa-solid fa-external-link"></i> Aceder
+                </a>
+            `;
+            resList.appendChild(item);
+        });
+    } else {
+        resSection.style.display = 'none';
+    }
+    
+    modal.style.display = 'flex';
+}
+
+function closeDetails() {
+    document.getElementById('details-modal').style.display = 'none';
+}
+
+function extractResources(text) {
+    const links = [];
+    const patterns = [
+        { type: 'Google Drive', icon: 'fa-brands fa-google-drive', regex: /https?:\/\/drive\.google\.com\/[^\s]+/g },
+        { type: 'Mega', icon: 'fa-solid fa-cloud', regex: /https?:\/\/mega\.nz\/[^\s]+/g },
+        { type: 'PDF / Documento', icon: 'fa-solid fa-file-pdf', regex: /https?:\/\/[^\s]+\.pdf[^\s]*/g },
+        { type: 'MediaFire', icon: 'fa-solid fa-fire', regex: /https?:\/\/www\.mediafire\.com\/[^\s]+/g }
+    ];
+
+    patterns.forEach(p => {
+        const matches = text.match(p.regex);
+        if (matches) {
+            matches.forEach(url => {
+                links.push({ type: p.type, icon: p.icon, url: url });
+            });
+        }
+    });
+
+    return links;
+}
+
 async function clearHistory() {
     if (!confirm("Tem a certeza que deseja limpar todo o histórico de downloads?")) return;
     try {
@@ -503,6 +629,19 @@ function handleCookieUpload(event) {
 
 async function uploadCookieFile(file) {
     const text = await file.text();
+    submitCookies(text);
+}
+
+function savePastedCookies() {
+    const text = document.getElementById('cookie-paste-area').value;
+    if (!text.trim()) {
+        alert("Por favor, cole o conteúdo dos cookies primeiro.");
+        return;
+    }
+    submitCookies(text);
+}
+
+async function submitCookies(text) {
     try {
         const res = await fetch('/api/save-cookies', {
             method: 'POST',
@@ -511,7 +650,8 @@ async function uploadCookieFile(file) {
         });
         const data = await res.json();
         if (data.success) {
-            alert("Cookies importados com sucesso!");
+            alert("Cookies guardados com sucesso!");
+            document.getElementById('cookie-paste-area').value = '';
         } else {
             alert("Erro ao salvar cookies.");
         }
@@ -520,6 +660,41 @@ async function uploadCookieFile(file) {
     }
 }
 
+// --- SYSTEM LOG CONSOLE ---
+
+function logEvent(msg) {
+    const terminal = document.getElementById('system-terminal');
+    if (!terminal) return;
+    
+    const time = new Date().toLocaleTimeString('pt-PT', { hour12: false });
+    const line = document.createElement('div');
+    line.className = 'terminal-line';
+    line.innerHTML = `<span style="color: #777;">[${time}]</span> > ${msg}`;
+    
+    terminal.appendChild(line);
+    terminal.scrollTop = terminal.scrollHeight;
+    
+    // Limitar número de linhas para performance
+    if (terminal.childNodes.length > 100) {
+        terminal.removeChild(terminal.firstChild);
+    }
+}
+
+// Hookar eventos existentes
+const originalAnalyze = analyzeVideoUrl;
+analyzeVideoUrl = function(url) {
+    logEvent(`Analysing request: ${url.substring(0, 50)}...`);
+    return originalAnalyze.apply(this, arguments);
+};
+
+const originalDownload = startDownload;
+startDownload = function(format) {
+    logEvent(`Initiating ${format.toUpperCase()} download sequence...`);
+    return originalDownload.apply(this, arguments);
+};
+
 // Inicializar
 handleRouting();
 loadHistory();
+logEvent("NexoVibe Dashboard Ready.");
+logEvent("Waiting for user input...");
