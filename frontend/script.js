@@ -14,15 +14,23 @@ let currentVideoInfo = null;
 
 // --- SOCKET.IO EVENTS ---
 socket.on('connect', () => {
-    socketStatus.innerText = 'Conectado';
-    socketStatus.style.color = '#4ade80';
-    logEvent("Socket Pipeline Established. Signal Strength: 100%");
+    socketStatus.innerText = 'Pipeline Ativo';
+    document.querySelector('.status-dot').style.background = '#4ade80';
+    document.querySelector('.status-dot').style.boxShadow = '0 0 15px #4ade80';
+    logEvent("System: Socket Pipeline Established. Node.js Engine Linked.");
 });
 
 socket.on('disconnect', () => {
-    socketStatus.innerText = 'Desconectado';
-    socketStatus.style.color = '#E50914';
-    logEvent("CRITICAL: Socket Signal Lost. Retrying...");
+    socketStatus.innerText = 'Pipeline Offline';
+    document.querySelector('.status-dot').style.background = '#ef4444';
+    document.querySelector('.status-dot').style.boxShadow = '0 0 15px #ef4444';
+    logEvent("CRITICAL: Connection Lost. Attempting Reconnection...");
+});
+
+socket.on('log', (data) => {
+    const typeTag = data.type === 'error' ? '[ERROR]' : (data.type === 'warn' ? '[WARN]' : '[INFO]');
+    const color = data.type === 'error' ? '#ef4444' : (data.type === 'warn' ? '#fbbf24' : '#4ade80');
+    logEvent(`<span style="color: ${color}">${typeTag}</span> ${data.msg}`);
 });
 
 socket.on('progress', (data) => {
@@ -493,8 +501,8 @@ function closeSettings() {
     }
 }
 
-async function syncCookies() {
-    const btn = event.currentTarget;
+async function syncCookies(e) {
+    const btn = (e && e.currentTarget) ? e.currentTarget : document.activeElement;
     const originalText = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sincronizando...';
@@ -532,8 +540,8 @@ async function openFolder() {
     fetch('/api/open-folder', { method: 'POST' });
 }
 
-async function updateEngine() {
-    const btn = event.currentTarget;
+async function updateEngine(e) {
+    const btn = (e && e.currentTarget) ? e.currentTarget : document.activeElement;
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Atualizando...';
     try {

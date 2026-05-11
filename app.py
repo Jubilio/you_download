@@ -98,7 +98,6 @@ class YDLProgressLogger:
         # O FFmpeg envia o progresso através do log de debug/info
         if '[download]' in msg and '%' in msg:
             try:
-                # Tenta extrair a percentagem do log: "[download]  10.5% of ..."
                 parts = msg.split()
                 for p in parts:
                     if '%' in p:
@@ -106,11 +105,19 @@ class YDLProgressLogger:
                         socketio.emit('progress', {'id': self.task_id, 'percent': percent, 'status': 'downloading'})
                         break
             except: pass
+        
+        # Enviar logs gerais para o terminal do frontend
+        if not any(x in msg for x in ['%', 'ETA']):
+            socketio.emit('log', {'id': self.task_id, 'msg': msg, 'type': 'info'})
         print(f"DEBUG [{self.task_id}]: {msg}")
 
     def info(self, msg): self.debug(msg)
-    def warning(self, msg): print(f"WARN [{self.task_id}]: {msg}")
-    def error(self, msg): print(f"ERROR [{self.task_id}]: {msg}")
+    def warning(self, msg): 
+        socketio.emit('log', {'id': self.task_id, 'msg': msg, 'type': 'warn'})
+        print(f"WARN [{self.task_id}]: {msg}")
+    def error(self, msg): 
+        socketio.emit('log', {'id': self.task_id, 'msg': msg, 'type': 'error'})
+        print(f"ERROR [{self.task_id}]: {msg}")
 
 def make_progress_hook(task_id):
     def hook(d):
@@ -145,60 +152,55 @@ def make_progress_hook(task_id):
     return hook
 
 def get_common_opts():
-    """Opções base de nível industrial para estabilidade máxima."""
+    """Configuração de Nível Industrial para Estabilidade Máxima."""
+    # Localizar Node.js automaticamente para resolver o n-challenge
+    node_path = 'node'
+    possible_paths = [r'C:\Program Files\nodejs\node.exe', r'C:\Program Files (x86)\nodejs\node.exe']
+    for p in possible_paths:
+        if os.path.exists(p):
+            node_path = p
+            break
+
     opts = {
         'ignoreconfig': True,
-        'no_warnings': True,
-        'download_archive': ARCHIVE_FILE,
-        'concurrent_fragment_downloads': 2,
-        'fragment_retries': 20,
-        'retries': 20,
-        'file_access_retries': 5,
-        'socket_timeout': 60,
-        'ignoreerrors': True,
-        'nocheckcertificate': True,
-        'geo_bypass': True,
-        'hls_prefer_native': True,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        
-        # 🔥 Configuração Ultra-Estável (Prioridade H264/MP4)
-        'format': 'bv*[vcodec^=avc1][ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b',
-        'merge_output_format': 'mp4',
-        'quiet': False,
-        'noplaylist': True,
-        'retries': 10,
-        'fragment_retries': 10,
-        'concurrent_fragment_downloads': 1,
-        
-        # 🔥 Bypass & Resiliência
-        'nocheckcertificate': True,
-        'ignoreerrors': True,
         'no_warnings': False,
+        'download_archive': ARCHIVE_FILE,
+        'retries': 20,
+        'fragment_retries': 20,
+        'socket_timeout': 60,
+        'ignoreerrors': False, # Queremos ver os erros para tratar
         
-        # 🔥 JS Runtime (Forçar o caminho absoluto para evitar falhas de detecção)
-        'javascript_runtime': NODE_PATH if os.path.exists(NODE_PATH) else 'node',
+        # 🔥 A SOLUÇÃO DEFINITIVA PARA O CODEC (Adeus AV1/Freeze)
+        # Prioriza H.264 (avc1) e Áudio M4A (AAC) para compatibilidade total e sem travamentos
+        'format': 'bestvideo[vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        'merge_output_format': 'mp4',
         
-        # 🔥 Autenticação
-        'cookiefile': COOKIES_FILE if os.path.exists(COOKIES_FILE) else None,
-
-        # 🔥 Opções de Robustez
-        'check_formats': False,
-        'youtube_include_dash_manifest': False,
-        'youtube_include_hls_manifest': False,
-
+        # 🔥 SOLUÇÃO PARA "n challenge" e PLAYER JS
+        'javascript_runtime': node_path,
         'extractor_args': {
             'youtube': {
-                'player_client': ['web', 'ios', 'android'],
-                'player_skip': ['webpage', 'configs'], # Tenta saltar partes problemáticas
+                'player_client': ['web', 'ios'], # 'web' resolve a maioria, 'ios' é fallback resiliente
+                'player_skip': ['webpage', 'configs'],
             }
         },
         
-        'http_headers': {
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-us,en;q=0.5',
-            'Sec-Fetch-Mode': 'navigate',
-        }
+        # 🔥 ANTI-FREEZE FFmpeg
+        'postprocessor_args': {
+            'merger': [
+                '-threads', '0', 
+                '-c:v', 'copy', 
+                '-c:a', 'aac', 
+                '-movflags', '+faststart'
+            ]
+        },
+        
+        'concurrent_fragment_downloads': 2,
+        'nocheckcertificate': True,
+        'geo_bypass': True,
+        'hls_prefer_native': True,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
     }
+    
     if os.path.exists(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 0:
         opts['cookiefile'] = COOKIES_FILE
     return opts
@@ -446,18 +448,34 @@ def download_single():
                 'restrictfilenames': True,
                 'progress_hooks': [make_progress_hook(video_id)],
                 'logger': YDLProgressLogger(video_id),
-                'postprocessor_args': {
-                    'merger': ['-c:a', 'aac'] if format_type == 'mp4' else []
-                }
+                # 🔥 Fallback automático se falhar
             }
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                if not info:
-                    # Se info for None, o yt-dlp provavelmente saltou o download (já no archive)
-                    socketio.emit('progress', {'id': video_id, 'percent': 100, 'status': 'finished'})
-                    return
+            
+            info = None
+            final_filename = None
+            
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=True)
+                    if info:
+                        final_filename = ydl.prepare_filename(info)
+            except Exception as e:
+                if "Requested format is not available" in str(e):
+                    print("[Engine] Fallback para 'best' genérico...")
+                    ydl_opts['format'] = 'best'
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        info = ydl.extract_info(url, download=True)
+                        if info:
+                            final_filename = ydl.prepare_filename(info)
+                else:
+                    raise e
 
-                final_filename = ydl.prepare_filename(info)
+            if not info:
+                # Se info for None, o yt-dlp provavelmente saltou o download (já no archive)
+                socketio.emit('progress', {'id': video_id, 'percent': 100, 'status': 'finished'})
+                return
+
+            if final_filename:
                 # O merge_output_format pode mudar a extensão, vamos garantir o nome real
                 if format_type == 'mp4' and not final_filename.endswith('.mp4'):
                     final_filename = os.path.splitext(final_filename)[0] + '.mp4'
@@ -544,9 +562,7 @@ def download_section():
             ydl_opts = {
                 **get_common_opts(), 
                 'download_archive': None, 
-                'format': 'bv*[ext=mp4]+ba[ext=m4a]/b', 
                 'outtmpl': out_tmpl, 
-                'merge_output_format': 'mp4',
                 'force_keyframes_at_cuts': True,
                 'nopart': True,
                 'download_ranges': lambda info, ydl: [{
@@ -555,15 +571,11 @@ def download_section():
                 }],
                 'progress_hooks': [make_progress_hook(section_id)],
                 'logger': YDLProgressLogger(section_id),
-                'postprocessor_args': {
-                    'merger': ['-c:a', 'aac'] 
-                }
             }
             
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                # Usar download() em vez de extract_info para disparar o processo de forma mais isolada
                 ydl.download([url])
-                # Precisamos dos metadados para o DB, então fazemos um extract rápido sem download
+                # Obter info para o DB
                 info = ydl.extract_info(url, download=False)
                 if not info:
                     raise Exception("Erro ao processar vídeo (retornou vazio).")

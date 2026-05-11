@@ -44,6 +44,10 @@
                     <i class="fa-solid fa-magnifying-glass search-icon"></i>
                     <input type="text" id="video-url" placeholder="Cole o link do YouTube aqui e prima Enter...">
                 </div>
+                <div class="system-status">
+                    <div class="status-dot"></div>
+                    <span id="socket-status">Conectando Pipeline...</span>
+                </div>
             </header>
 
             <div id="dashboard-section">
@@ -53,7 +57,10 @@
             <section id="hero-preview" class="hero-preview">
                 <img id="hero-img" src="" class="hero-img" alt="">
                 <div class="hero-overlay">
-                    <div class="hero-badge">Original YouDown</div>
+                    <div class="hero-brand">
+                        <span class="badge-red">YDL-CORE PRO</span>
+                        <span class="badge-glass">ULTRA-ESTÁVEL</span>
+                    </div>
                     <h2 id="hero-title" class="hero-title">Título do Vídeo</h2>
                     <p id="hero-channel" style="color: #b3b3b3; margin-bottom: 1.5rem;">Canal do YouTube</p>
                     <div id="hero-actions" class="hero-actions">
@@ -176,7 +183,7 @@
                     <p>Sincronize com o seu navegador para aceder a conteúdos restritos.</p>
                     
                     <div class="sync-actions">
-                        <button class="btn btn-primary btn-full" onclick="syncCookies()">
+                        <button class="btn btn-primary btn-full" onclick="syncCookies(event)">
                             <i class="fa-solid fa-sync"></i> Sincronização Automática
                         </button>
                         <p style="font-size: 10px; color: #777; margin-top: 5px;">Nota: Pode exigir permissões de Administrador.</p>
@@ -212,7 +219,7 @@
                 <div class="settings-group">
                     <h4><i class="fa-solid fa-microchip"></i> Motor yt-dlp</h4>
                     <p>Mantenha o motor de download atualizado para evitar erros.</p>
-                    <button class="btn btn-secondary btn-full" onclick="updateEngine()">
+                    <button class="btn btn-secondary btn-full" onclick="updateEngine(event)">
                         <i class="fa-solid fa-bolt"></i> Atualizar Motor
                     </button>
                 </div>
