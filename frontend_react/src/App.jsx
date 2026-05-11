@@ -379,8 +379,8 @@ export default function App() {
             </>
           )}
 
-          {activeTab === 'history' && <HistoryView />}
-          {activeTab === 'settings' && <SettingsView />}
+          {activeTab === 'history' && <HistoryView notify={notify} />}
+          {activeTab === 'settings' && <SettingsView notify={notify} />}
 
           <AnimatePresence>
             {showDetails && (
@@ -454,7 +454,7 @@ export default function App() {
   );
 }
 
-function HistoryView() {
+function HistoryView({ notify }) {
   const [history, setHistory] = useState([]);
   useEffect(() => { fetchHistory(); }, []);
 
@@ -463,6 +463,15 @@ function HistoryView() {
       const res = await axios.get(`${API_BASE}/api/history`);
       setHistory(res.data.files || []);
     } catch (e) { console.error(e); }
+  };
+
+  const playVideo = async (file_path) => {
+    try {
+      const res = await axios.post(`${API_BASE}/api/play`, { file_path });
+      if (!res.data.success) notify("Erro", res.data.message || "Não foi possível abrir o vídeo.", "error");
+    } catch (e) {
+      notify("Erro", "Erro ao tentar abrir o ficheiro.", "error");
+    }
   };
 
   const deleteItem = async (id) => {
@@ -487,18 +496,23 @@ function HistoryView() {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {history.map(item => (
-          <div key={item.id} className="glass rounded-xl overflow-hidden group">
-            <div className="relative aspect-video">
-              <img src={item.thumbnail || '/favicon.png'} className="w-full h-full object-cover" />
-              <div className="absolute top-2 right-2 bg-black/80 px-2 py-1 rounded text-[10px] font-bold uppercase border border-white/10">{item.format}</div>
-            </div>
-            <div className="p-4 flex justify-between items-start">
-              <div className="pr-2">
-                <h4 className="font-bold line-clamp-2 mb-1 text-sm">{item.title}</h4>
-                <p className="text-[10px] text-white/50">{item.channel} • {item.date}</p>
+          <div key={item.id} className="glass rounded-xl overflow-hidden group/card shadow-lg hover:shadow-yd-primary/10 transition-all border border-white/5">
+            <div className="relative aspect-video group/thumb cursor-pointer overflow-hidden" onClick={() => playVideo(item.file_path)}>
+              <img src={item.thumbnail || '/favicon.png'} className="w-full h-full object-cover group-hover/thumb:scale-110 transition-transform duration-700" />
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center">
+                <div className="bg-yd-primary p-4 rounded-full shadow-2xl scale-75 group-hover/thumb:scale-100 transition-transform">
+                  <Play className="text-white ml-1" fill="white" size={32} />
+                </div>
               </div>
-              <button onClick={() => deleteItem(item.id)} className="text-white/30 hover:text-red-500 transition-colors p-1">
-                <X size={16} />
+              <div className="absolute top-2 right-2 bg-black/80 px-2 py-1 rounded text-[10px] font-bold uppercase border border-white/10 backdrop-blur-md">{item.format}</div>
+            </div>
+            <div className="p-4 flex justify-between items-start bg-white/5">
+              <div className="pr-2 min-w-0">
+                <h4 className="font-bold truncate mb-1 text-sm text-white/90">{item.title}</h4>
+                <p className="text-[10px] text-white/40 font-medium">{item.channel} • {item.date}</p>
+              </div>
+              <button onClick={() => deleteItem(item.id)} className="text-white/20 hover:text-red-500 transition-colors p-1 flex-shrink-0">
+                <Trash2 size={16} />
               </button>
             </div>
           </div>
@@ -508,7 +522,7 @@ function HistoryView() {
   );
 }
 
-function SettingsView() {
+function SettingsView({ notify }) {
   const [loading, setLoading] = useState(null);
 
   const syncCookies = async () => {

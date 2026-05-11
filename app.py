@@ -691,6 +691,18 @@ def select_folder():
         return jsonify({'success': False})
     except Exception as e: return jsonify({'error': str(e)}), 500
 
+@app.route('/api/play', methods=['POST'])
+def play_video():
+    data = request.json
+    file_path = data.get('file_path')
+    if file_path and os.path.exists(file_path):
+        try:
+            os.startfile(file_path)
+            return jsonify({'success': True})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+    return jsonify({'success': False, 'message': 'Ficheiro não encontrado ou caminho inválido.'}), 404
+
 @app.route('/api/open-folder', methods=['POST'])
 def open_folder(): subprocess.Popen(f'explorer "{DOWNLOAD_FOLDER}"'); return jsonify({'success': True})
 
