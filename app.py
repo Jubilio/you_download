@@ -13,16 +13,25 @@ import traceback
 import browser_cookie3
 import http.cookiejar
 import platform
+import shutil
+import json
 import sys
 import queue
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 
 # --- INJEÇÃO DE DEPENDÊNCIAS (WINDOWS) ---
 if platform.system() == 'Windows':
-    node_paths = [r"C:\Program Files\nodejs", r"C:\Program Files (x86)\nodejs"]
+    # Tenta localizar o Node.js em locais comuns
+    node_paths = [
+        r"C:\Program Files\nodejs", 
+        r"C:\Program Files (x86)\nodejs",
+        os.path.join(os.environ.get('APPDATA', ''), 'npm')
+    ]
     for p in node_paths:
         if os.path.exists(p) and p not in os.environ.get('PATH', ''):
-            os.environ['PATH'] = f"{p};{os.environ.get('PATH', '')}"
+            os.environ['PATH'] = f"{p}{os.pathsep}{os.environ.get('PATH', '')}"
+            print(f"[System] Node.js injetado no PATH: {p}")
 
 DB_PATH = os.path.join(os.getcwd(), 'history.db')
 
@@ -86,8 +95,21 @@ def page_not_found(e):
 # Usando async_mode='threading' para eliminar dependência do Eventlet (deprecated)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
-# Fila de tarefas para controlo de concorrência
-task_queue = queue.Queue()
+# Executor para downloads simultâneos (3 ao mesmo tempo)
+executor = ThreadPoolExecutor(max_workers=3)
+
+def show_notification(title, message):
+    """Mostra uma notificação nativa se possível."""
+    try:
+        if platform.system() == 'Windows':
+            # Comando PowerShell para toast notification simples
+            clean_msg = message.replace("'", "")
+            cmd = f'powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show(\'{clean_msg}\', \'{title}\')"'
+            # Para não bloquear, usamos Popen
+            subprocess.Popen(cmd, shell=True)
+        else:
+            print(f"[Notificação] {title}: {message}")
+    except: pass
 
 DOWNLOAD_FOLDER = os.path.join(os.path.expanduser("~"), "Downloads")
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
@@ -146,7 +168,11 @@ class YDLProgressLogger:
         socketio.emit('log', {'id': self.task_id, 'msg': msg, 'type': 'warn'})
         print(f"WARN [{self.task_id}]: {msg}")
     def error(self, msg): 
-        socketio.emit('log', {'id': self.task_id, 'msg': msg, 'type': 'error'})
+        clean_msg = clean_ansi(msg)
+        if 'Sign in to confirm you’re not a bot' in clean_msg:
+            socketio.emit('log', {'id': self.task_id, 'msg': '🛑 YouTube bloqueou o acesso. Por favor, vá às Definições e clique em "Sincronizar Cookies".', 'type': 'error'})
+        else:
+            socketio.emit('log', {'id': self.task_id, 'msg': clean_msg, 'type': 'error'})
         print(f"ERROR [{self.task_id}]: {msg}")
 
 def make_progress_hook(task_id):
@@ -184,12 +210,20 @@ def make_progress_hook(task_id):
 def get_common_opts():
     """Configuração de Nível Industrial para Estabilidade Máxima."""
     # Localizar Node.js automaticamente para resolver o n-challenge
-    node_path = 'node'
-    possible_paths = [r'C:\Program Files\nodejs\node.exe', r'C:\Program Files (x86)\nodejs\node.exe']
+    possible_paths = [
+        r'C:\Program Files\nodejs\node.exe', 
+        r'C:\Program Files (x86)\nodejs\node.exe',
+        os.path.join(os.environ.get('APPDATA', ''), 'nvm', 'v20.11.0', 'node.exe'), # Exemplo NVM
+    ]
+    node_found = None
     for p in possible_paths:
         if os.path.exists(p):
-            node_path = p
+            node_found = os.path.dirname(p)
             break
+            
+    if node_found and node_found not in os.environ['PATH']:
+        os.environ['PATH'] = node_found + os.pathsep + os.environ['PATH']
+        print(f"[Sistema] Node.js injetado no PATH: {node_found}")
 
     opts = {
         'ignoreconfig': True,
@@ -201,16 +235,24 @@ def get_common_opts():
         'ignoreerrors': False, # Queremos ver os erros para tratar
         
         # 🔥 A SOLUÇÃO DEFINITIVA PARA O CODEC (Adeus AV1/Freeze)
-        # Prioriza H.264 (avc1) e Áudio M4A (AAC) até 720p para compatibilidade total
-        'format': 'bestvideo[height<=720][vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best',
+        # Prioriza H.264 até 720p, mas tem fallback total para qualquer formato disponível
+        'format': 'bestvideo[height<=720][vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/bestvideo+bestaudio/best',
         'merge_output_format': 'mp4',
         
         # 🔥 SOLUÇÃO PARA "n challenge" e PLAYER JS
-        # O yt-dlp detecta o node/deno automaticamente se estiver no PATH
+        # O yt-dlp deteta o node/deno automaticamente se estiver no PATH
         'extractor_args': {
             'youtube': {
-                'player_client': ['ios', 'android', 'web_creator', 'mweb']
+                # Prioriza clientes que SUPORTAM cookies para evitar bloqueio de bot
+                'player_client': ['web', 'web_creator', 'mweb', 'tv'],
+                'player_skip': ['webpage', 'configs']
             }
+        },
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-us,en;q=0.5',
+            'Sec-Fetch-Mode': 'navigate',
         },
         
         # 🔥 ANTI-FREEZE FFmpeg
@@ -223,10 +265,18 @@ def get_common_opts():
             ]
         },
         
-        'concurrent_fragment_downloads': 2,
+        'concurrent_fragment_downloads': 5, # Aumentado para maior velocidade
         'nocheckcertificate': True,
         'geo_bypass': True,
         'hls_prefer_native': True,
+        
+        # 🔥 EMBED METADATA (Dá o aspeto Pro aos ficheiros)
+        'writethumbnail': True,
+        'postprocessors': [
+            {'key': 'FFmpegMetadata', 'add_chapters': True, 'add_metadata': True},
+            {'key': 'EmbedThumbnail', 'already_have_thumbnail': False},
+        ],
+        
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'continuedl': False, # Resolve o erro 416: Requested range not satisfiable (força reiniciar em vez de falhar no resume)
     }
@@ -258,60 +308,80 @@ def get_browser_cookie_path(browser_name):
 LAST_SYNC_TIME = 0
 @app.route('/api/sync-cookies', methods=['POST'])
 def sync_cookies():
-    """Sincroniza cookies com cache para evitar múltiplas tentativas falhadas."""
+    """Sincroniza cookies com cache para evitar múltiplas tentativas falhadas. 
+    Usa CoInitialize para evitar erros de COM em threads no Windows."""
     global LAST_SYNC_TIME
     now = time.time()
-    if now - LAST_SYNC_TIME < 300: # Cache de 5 minutos
-        has_cookies = os.path.exists(COOKIES_FILE)
-        return jsonify({'success': has_cookies, 'browser': 'Cache' if has_cookies else '', 'message': 'Operação em cooldown de 5 min.' if not has_cookies else ''})
     
-    LAST_SYNC_TIME = now
-    success_browser = None
-    
-    # Lista de funções de extração do browser-cookie3
-    extraction_methods = [
-        ('edge', browser_cookie3.edge),
-        ('chrome', browser_cookie3.chrome),
-        ('brave', browser_cookie3.brave),
-        ('firefox', browser_cookie3.firefox),
-        ('opera', browser_cookie3.opera)
-    ]
-    
-    for name, method in extraction_methods:
-        try:
-            print(f"[Sync] Tentando extrair cookies do {name}...")
-            # Extrai cookies filtrando apenas para youtube.com
-            cj = method(domain_name='youtube.com')
-            
-            if cj:
-                # Salva no formato Netscape (o que o yt-dlp gosta)
-                with open(COOKIES_FILE, 'w', encoding='utf-8') as f:
-                    f.write("# Netscape HTTP Cookie File\n")
-                    f.write("# http://curl.haxx.se/rfc/cookie_spec.html\n")
-                    f.write("# This is a generated file!  Do not edit.\n\n")
-                    
-                    for cookie in cj:
-                        # Formato: domain, flag, path, secure, expiration, name, value
-                        domain = cookie.domain
-                        flag = "TRUE" if domain.startswith('.') else "FALSE"
-                        path = cookie.path
-                        secure = "TRUE" if cookie.secure else "FALSE"
-                        expires = str(cookie.expires) if cookie.expires else "0"
-                        name_val = cookie.name
-                        value = cookie.value
-                        
-                        f.write(f"{domain}\t{flag}\t{path}\t{secure}\t{expires}\t{name_val}\t{value}\n")
-                
-                if os.path.exists(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 100:
-                    success_browser = name
-                    break
-        except Exception as e:
-            print(f"[Sync] Falha no {name}: {str(e)}")
-            continue
+    # Importação local para evitar erros em sistemas não-Windows ou sem pywin32
+    try:
+        import pythoncom
+        pythoncom.CoInitialize()
+    except:
+        pass
 
-    if success_browser:
-        return jsonify({'success': True, 'browser': success_browser.capitalize()})
-    
+    try:
+        if now - LAST_SYNC_TIME < 300: # Cache de 5 minutos
+            has_cookies = os.path.exists(COOKIES_FILE)
+            return jsonify({'success': has_cookies, 'browser': 'Cache' if has_cookies else '', 'message': 'Operação em cooldown de 5 min.' if not has_cookies else ''})
+        
+        LAST_SYNC_TIME = now
+        success_browser = None
+        
+        # Lista de funções de extração do browser-cookie3
+        extraction_methods = [
+            ('edge', browser_cookie3.edge),
+            ('chrome', browser_cookie3.chrome),
+            ('brave', browser_cookie3.brave),
+            ('firefox', browser_cookie3.firefox),
+            ('opera', browser_cookie3.opera)
+        ]
+        
+        for name, method in extraction_methods:
+            try:
+                print(f"[Sync] Tentando extrair cookies do {name}...")
+                # Extrai cookies filtrando apenas para youtube.com
+                cj = method(domain_name='youtube.com')
+                
+                if cj:
+                    # Salva no formato Netscape (o que o yt-dlp gosta)
+                    with open(COOKIES_FILE, 'w', encoding='utf-8') as f:
+                        f.write("# Netscape HTTP Cookie File\n")
+                        f.write("# http://curl.haxx.se/rfc/cookie_spec.html\n")
+                        f.write("# This is a generated file!  Do not edit.\n\n")
+                        
+                        for cookie in cj:
+                            # Formato: domain, flag, path, secure, expiration, name, value
+                            domain = cookie.domain
+                            flag = "TRUE" if domain.startswith('.') else "FALSE"
+                            path = cookie.path
+                            secure = "TRUE" if cookie.secure else "FALSE"
+                            expires = str(cookie.expires) if cookie.expires else "0"
+                            name_val = cookie.name
+                            value = cookie.value
+                            
+                            f.write(f"{domain}\t{flag}\t{path}\t{secure}\t{expires}\t{name_val}\t{value}\n")
+                    
+                    if os.path.exists(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 100:
+                        success_browser = name
+                        break
+            except Exception as e:
+                print(f"[Sync] Falha no {name}: {str(e)}")
+                continue
+
+        if success_browser:
+            return jsonify({'success': True, 'browser': success_browser.capitalize()})
+            
+    except Exception as e:
+        print(f"[Sync Critical Error] {str(e)}")
+        return jsonify({'success': False, 'message': f'Erro crítico na sincronização: {str(e)}'}), 500
+    finally:
+        try:
+            import pythoncom
+            pythoncom.CoUninitialize()
+        except:
+            pass
+
     return jsonify({
         'success': False, 
         'message': 'Não foi possível encontrar cookies ativos. Certifique-se de que o YouTube está aberto no navegador e tente novamente.'
@@ -329,13 +399,11 @@ def save_cookies():
 def get_info():
     try:
         data = request.get_json(silent=True)
-        if not data:
-            return jsonify({'error': 'JSON inválido ou ausente.'}), 400
+        if not data or 'url' not in data:
+            print(f"[Analise] Erro: Dados ausentes ou URL não fornecida. Recebido: {data}")
+            return jsonify({'error': 'URL inválida ou ausente.'}), 400
         
         url = data.get('url')
-        if not url:
-            return jsonify({'error': 'URL é obrigatória.'}), 400
-            
         print(f"[Analise] Processando URL: {url}")
         
         opts = get_common_opts()
@@ -344,6 +412,8 @@ def get_info():
             'extract_flat': 'in_playlist',
             'noplaylist': False, # Permitir analisar playlists
             'extract_chapters': True,
+            'writethumbnail': False, # Não baixar thumbnails físicas durante análise
+            'skip_download': True,
         })
         
         with yt_dlp.YoutubeDL(opts) as ydl:
@@ -353,14 +423,14 @@ def get_info():
                 error_msg = str(e)
                 user_friendly_error = "Erro ao analisar o link."
                 
-                if "confirm you're not a bot" in error_msg:
-                    user_friendly_error = "YouTube bloqueou o acesso (Bot). Use a Sincronização de Cookies nas Definições."
+                if "confirm you're not a bot" in error_msg or "Sign in to confirm" in error_msg:
+                    user_friendly_error = "🛑 YouTube bloqueou o acesso (Bot). Por favor, vá às Definições e clique em 'Sincronizar Cookies'."
                 elif "Requested format is not available" in error_msg or "Only images are available" in error_msg:
-                    user_friendly_error = "O YouTube bloqueou o vídeo (Proteção Bot). Por favor, vá às Definições e faça Sincronização de Cookies."
+                    user_friendly_error = "🛑 O YouTube bloqueou este vídeo por proteção contra bots. Sincronize os Cookies nas Definições."
                 elif "copyright claim" in error_msg.lower():
-                    user_friendly_error = "Vídeo removido por direitos de autor."
+                    user_friendly_error = "⚠️ Vídeo removido por direitos de autor."
                 elif "Video unavailable" in error_msg:
-                    user_friendly_error = "Vídeo indisponível ou privado."
+                    user_friendly_error = "⚠️ Vídeo indisponível ou privado."
                 
                 print(f"[Análise Erro] {error_msg}")
                 return jsonify({'error': user_friendly_error}), 400
@@ -385,11 +455,29 @@ def get_info():
             if not main_thumbnail and 'thumbnails' in info and info['thumbnails']: main_thumbnail = info['thumbnails'][0].get('url')
             if not main_thumbnail and entries: main_thumbnail = entries[0].get('thumbnail')
 
+            # Extrair qualidades de vídeo disponíveis (filtradas e únicas)
+            available_formats = []
+            seen_heights = set()
+            for f in info.get('formats', []):
+                h = f.get('height')
+                if h and h not in seen_heights and f.get('vcodec') != 'none':
+                    # Apenas resoluções standard para manter a UI limpa
+                    if h in [2160, 1440, 1080, 720, 480, 360, 240, 144]:
+                        available_formats.append({
+                            'height': h,
+                            'label': f"{h}p" + (" (4K)" if h == 2160 else " (2K)" if h == 1440 else " (HD)" if h >= 720 else ""),
+                            'ext': 'mp4'
+                        })
+                        seen_heights.add(h)
+            
+            available_formats.sort(key=lambda x: x['height'], reverse=True)
+
             return jsonify({
                 'id': info.get('id'), 'title': info.get('title'), 'thumbnail': main_thumbnail,
                 'channel': info.get('uploader') or info.get('channel'), 'description': info.get('description', ''),
                 'url': url, 'is_playlist': False, 'entries': entries, 'current_path': DOWNLOAD_FOLDER,
-                'chapters': info.get('chapters', []), 'duration': info.get('duration', 0)
+                'chapters': info.get('chapters', []), 'duration': info.get('duration', 0),
+                'formats': available_formats
             })
     except Exception as e: 
         print(f"[Error] Info Extraction: {str(e)}")
@@ -446,116 +534,62 @@ def add_to_history_db(video_id, title, channel, thumbnail, filename, file_path, 
     except Exception as e:
         print(f"[DB Error] {str(e)}")
 
+def show_notification(title, message):
+    try:
+        from plyer import notification
+        notification.notify(title=title, message=message, app_name='YouDown Pro', timeout=5)
+    except: pass
+
+def run_download(url, video_id, format_type, title_hint, thumb_hint, channel_hint, playlist_title, playlist_index, quality):
+    try:
+        socketio.emit('progress', {'id': video_id, 'percent': 0, 'status': 'starting', 'title': title_hint, 'thumbnail': thumb_hint})
+        subfolder = ""
+        if playlist_title:
+            clean_title = re.sub(r'[\\/*?:"<>|]', "", playlist_title).strip()
+            subfolder = f"{clean_title}/"
+            os.makedirs(os.path.join(DOWNLOAD_FOLDER, clean_title), exist_ok=True)
+        out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"{subfolder}{int(playlist_index):02d} - %(title)s.%(ext)s" if playlist_index else f"{subfolder}%(title)s.%(ext)s")
+        if format_type == 'mp4':
+            q_val = quality if quality else '720'
+            format_str = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/bestvideo+bestaudio/best' if q_val == 'best' else f'bestvideo[height<={q_val}][ext=mp4]+bestaudio[ext=m4a]/best[height<={q_val}][ext=mp4]/bestvideo+bestaudio/best'
+        else: format_str = 'bestaudio/best'
+        
+        ydl_opts = {**get_common_opts(), 'format': format_str, 'outtmpl': out_tmpl, 'merge_output_format': 'mp4' if format_type == 'mp4' else None, 'restrictfilenames': True, 'progress_hooks': [make_progress_hook(video_id)], 'logger': YDLProgressLogger(video_id)}
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            if info:
+                final_filename = ydl.prepare_filename(info)
+                if format_type == 'mp4' and not final_filename.endswith('.mp4'): final_filename = os.path.splitext(final_filename)[0] + '.mp4'
+                show_notification("YouDown Pro", f"Concluído: {title_hint}")
+                add_to_history_db(video_id, info.get('title', title_hint), info.get('uploader', channel_hint), info.get('thumbnail', thumb_hint), os.path.basename(final_filename), final_filename, format_type)
+                socketio.emit('progress', {'id': video_id, 'percent': 100, 'status': 'finished'})
+    except Exception as e:
+        print(f"[Download Error] {str(e)}")
+        socketio.emit('progress', {'id': video_id, 'percent': 0, 'status': 'error', 'msg': str(e)})
+        show_notification("Erro", f"Falha no download: {title_hint}")
+
 @app.route('/api/download-single', methods=['POST'])
 def download_single():
     data = request.json
-    url, video_id, format_type, playlist_title = data.get('url'), data.get('id'), data.get('format', 'mp4'), data.get('playlist_title', '')
-    playlist_index = data.get('index')
-    # Metadados adicionais passados pelo frontend para o DB
-    title_hint = data.get('title', 'Vídeo')
-    channel_hint = data.get('channel', 'Canal')
-    thumb_hint = data.get('thumbnail', '')
-
-    def run_download():
-        try:
-            socketio.emit('progress', {
-                'id': video_id, 
-                'percent': 0, 
-                'status': 'starting',
-                'title': title_hint,
-                'thumbnail': thumb_hint
-            })
-            
-            # Sanitização e criação de subpasta para playlists
-            subfolder = ""
-            if playlist_title:
-                # Remove caracteres inválidos para pastas no Windows
-                clean_title = re.sub(r'[\\/*?:"<>|]', "", playlist_title).strip()
-                subfolder = f"{clean_title}/"
-                os.makedirs(os.path.join(DOWNLOAD_FOLDER, clean_title), exist_ok=True)
-
-            if playlist_index:
-                # Usa o índice enviado pelo frontend para garantir a mesma ordenação
-                out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"{subfolder}{int(playlist_index):02d} - %(title)s.%(ext)s")
-            else:
-                out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"{subfolder}%(title)s.%(ext)s")
-            
-            # Engine Robusta Definitiva: bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720]
-            # Prioriza H.264 e AAC até 720p para compatibilidade e velocidade
-            format_str = 'bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720]' if format_type == 'mp4' else 'ba/b'
-            
-            ydl_opts = {
-                **get_common_opts(), 
-                'format': format_str, 
-                'outtmpl': out_tmpl, 
-                'merge_output_format': 'mp4' if format_type == 'mp4' else None, 
-                'restrictfilenames': True,
-                'progress_hooks': [make_progress_hook(video_id)],
-                'logger': YDLProgressLogger(video_id),
-                # 🔥 Fallback automático se falhar
-            }
-            
-            info = None
-            final_filename = None
-            
-            try:
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(url, download=True)
-                    if info:
-                        final_filename = ydl.prepare_filename(info)
-            except Exception as e:
-                if "Requested format is not available" in str(e):
-                    print("[Engine] Fallback para 'best' genérico...")
-                    ydl_opts['format'] = 'best'
-                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                        info = ydl.extract_info(url, download=True)
-                        if info:
-                            final_filename = ydl.prepare_filename(info)
-                else:
-                    raise e
-
-            if not info:
-                # Se info for None, o yt-dlp provavelmente saltou o download (já no archive)
-                socketio.emit('progress', {'id': video_id, 'percent': 100, 'status': 'finished'})
-                return
-
-            if final_filename:
-                # O merge_output_format pode mudar a extensão, vamos garantir o nome real
-                if format_type == 'mp4' and not final_filename.endswith('.mp4'):
-                    final_filename = os.path.splitext(final_filename)[0] + '.mp4'
-                
-                # Salvar no Banco de Dados
-                add_to_history_db(
-                    video_id, 
-                    info.get('title', title_hint), 
-                    info.get('uploader', channel_hint), 
-                    info.get('thumbnail', thumb_hint),
-                    os.path.basename(final_filename),
-                    final_filename,
-                    format_type
-                )
-            socketio.emit('progress', {'id': video_id, 'percent': 100, 'status': 'finished'})
-        except DownloadCancelled:
-            socketio.emit('progress', {'id': video_id, 'percent': 0, 'status': 'cancelled'})
-        except Exception as e:
-            error_msg = str(e)
-            user_friendly_error = "Erro no processamento."
-            
-            if "copyright claim" in error_msg.lower():
-                user_friendly_error = "Vídeo removido por direitos de autor (Copyright)."
-            elif "Requested format is not available" in error_msg:
-                user_friendly_error = "Formato indisponível. Tente MP3 ou atualize o motor."
-            elif "Sign in to confirm you’re not a bot" in error_msg:
-                user_friendly_error = "YouTube bloqueou o acesso (Bot). Use Cookies."
-            elif "Video unavailable" in error_msg:
-                user_friendly_error = "Vídeo indisponível ou privado."
-            
-            print(f"Download error: {error_msg}")
-            socketio.emit('progress', {'id': video_id, 'status': 'error', 'error': user_friendly_error})
-        finally:
-            if video_id in cancelled_tasks: cancelled_tasks.remove(video_id)
+    if not data: return jsonify({'error': 'JSON em falta'}), 400
     
-    task_queue.put((run_download, ()))
+    url = data.get('url')
+    video_id = data.get('id')
+    format_type = data.get('format', 'mp4')
+    quality = data.get('quality')
+    title_hint = data.get('title', 'Video')
+    thumb_hint = data.get('thumbnail', '')
+    channel_hint = data.get('channel', 'Unknown')
+    playlist_title = data.get('playlist_title')
+    playlist_index = data.get('index')
+
+    if not url or not video_id:
+        return jsonify({'error': 'URL ou ID em falta'}), 400
+
+    # Iniciar download concorrente no ThreadPoolExecutor
+    executor.submit(run_download, url, video_id, format_type, title_hint, thumb_hint, channel_hint, playlist_title, playlist_index, quality)
+    print(f"[Sistema] Download iniciado em paralelo: {video_id}")
     return jsonify({'success': True})
 
 @app.route('/api/cancel', methods=['POST'])
@@ -683,7 +717,8 @@ def get_history():
                 'channel': row['channel'] if 'channel' in row_keys else '',
                 'thumbnail': row['thumbnail'] if 'thumbnail' in row_keys else '',
                 'date': row['date'] if 'date' in row_keys else '',
-                'format': row['format'] if 'format' in row_keys else 'mp4'
+                'format': row['format'] if 'format' in row_keys else 'mp4',
+                'file_path': row['file_path'] if 'file_path' in row_keys else ''
             })
         conn.close()
         return jsonify({'files': files, 'current_path': DOWNLOAD_FOLDER})
@@ -806,25 +841,7 @@ def stream_file(filename):
 
 
 
-def task_worker():
-    """Worker que processa a fila de downloads de forma controlada."""
-    print("[Sistema] Worker de downloads iniciado.")
-    while True:
-        task = task_queue.get()
-        if task is None: break
-        
-        func, args = task
-        try:
-            func(*args)
-        except Exception as e:
-            print(f"[Erro Fila] Erro ao processar tarefa: {str(e)}")
-        finally:
-            task_queue.task_done()
-
 if __name__ == '__main__':
-    # Iniciar worker em background
-    threading.Thread(target=task_worker, daemon=True).start()
-
     is_frozen = getattr(sys, 'frozen', False)
     host_addr = '127.0.0.1'
     

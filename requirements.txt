@@ -8,3 +8,4 @@ pyinstaller
 requests
 python-socketio
 eventlet
+pywin32

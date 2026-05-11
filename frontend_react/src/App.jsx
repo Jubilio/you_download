@@ -30,6 +30,7 @@ export default function App() {
 
   const [showCut, setShowCut] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [selectedQuality, setSelectedQuality] = useState('720');
   const [cutStart, setCutStart] = useState('00:00:00');
   const [cutEnd, setCutEnd] = useState('00:00:10');
   const [cutName, setCutName] = useState('Meu Recorte');
@@ -60,19 +61,22 @@ export default function App() {
     }
   };
 
-  const handleDownload = async (format = 'mp4') => {
+  const handleDownload = async (format_type = 'mp4') => {
     if (!videoInfo) return;
+    const video_id = videoInfo.id;
+    setTasks(prev => ({ ...prev, [video_id]: { id: video_id, title: videoInfo.title, status: 'starting', percent: 0, thumbnail: videoInfo.thumbnail } }));
     try {
-      await axios.post(`${API_BASE}/api/download-single`, { 
+      await axios.post(`${API_BASE}/api/download-single`, {
         url: videoInfo.url || videoInfo.webpage_url,
-        id: videoInfo.id,
-        format,
+        id: video_id,
+        format: format_type,
+        quality: selectedQuality,
         title: videoInfo.title,
         thumbnail: videoInfo.thumbnail,
         channel: videoInfo.channel || videoInfo.uploader
       });
     } catch (err) {
-      notify("Erro", "Erro ao iniciar download", "error");
+      notify("Erro", "Falha ao iniciar download", "error");
     }
   };
 
@@ -264,9 +268,23 @@ export default function App() {
                       <span className="bg-yd-primary/20 text-yd-primary border border-yd-primary/30 px-3 py-1 rounded text-xs font-bold mb-4 inline-block">YOUDOWN PRO</span>
                       <h1 className="text-3xl md:text-5xl font-black mb-4 leading-tight">{videoInfo.title}</h1>
                       <div className="flex flex-wrap items-center gap-4">
-                        <button onClick={() => handleDownload('mp4')} className="bg-white text-black px-6 py-3 rounded-lg font-bold flex items-center gap-2 hover:bg-white/90 transition-colors">
+                        <button onClick={() => handleDownload('mp4')} className="bg-yd-primary text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 hover:bg-red-600 transition-colors shadow-lg shadow-yd-primary/20">
                           <Play fill="currentColor" size={20} /> VÍDEO
                         </button>
+                        
+                        {videoInfo.formats?.length > 0 && (
+                          <select 
+                            value={selectedQuality} 
+                            onChange={(e) => setSelectedQuality(e.target.value)}
+                            className="bg-white/10 backdrop-blur-md text-white px-4 py-3 rounded-lg font-bold border border-white/20 outline-none cursor-pointer hover:bg-white/20 transition-colors text-sm"
+                          >
+                            {videoInfo.formats.map(f => (
+                              <option key={f.height} value={f.height} className="bg-[#1a1a1a]">{f.label}</option>
+                            ))}
+                            <option value="best" className="bg-[#1a1a1a]">Máxima Disponível</option>
+                          </select>
+                        )}
+
                         <button onClick={() => handleDownload('mp3')} className="bg-white/10 backdrop-blur-md text-white px-6 py-3 rounded-lg font-bold border border-white/20 hover:bg-white/20 transition-colors flex items-center gap-2">
                           <Music size={20} /> ÁUDIO
                         </button>
