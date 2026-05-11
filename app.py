@@ -13,6 +13,18 @@ import traceback
 import browser_cookie3
 import http.cookiejar
 
+# --- FORÇAR RECONHECIMENTO DO NODE.JS ---
+# Se o Node.js foi instalado mas o terminal não foi reiniciado, isto injeta-o no PATH para o yt-dlp o encontrar
+node_paths = [
+    r"C:\Program Files\nodejs",
+    r"C:\Program Files (x86)\nodejs"
+]
+current_path = os.environ.get('PATH', '')
+for p in node_paths:
+    if os.path.exists(p) and p not in current_path:
+        os.environ['PATH'] = f"{p};{current_path}"
+        print(f"[System] Node.js adicionado ao PATH: {p}")
+
 import sys
 import queue
 import sqlite3
@@ -176,11 +188,10 @@ def get_common_opts():
         'merge_output_format': 'mp4',
         
         # 🔥 SOLUÇÃO PARA "n challenge" e PLAYER JS
-        'javascript_runtime': node_path,
+        # O yt-dlp detecta o node/deno automaticamente se estiver no PATH
         'extractor_args': {
             'youtube': {
-                'player_client': ['web', 'ios'], # 'web' resolve a maioria, 'ios' é fallback resiliente
-                'player_skip': ['webpage', 'configs'],
+                'player_client': ['ios', 'android', 'web_creator', 'mweb']
             }
         },
         
@@ -232,7 +243,8 @@ def sync_cookies():
     global LAST_SYNC_TIME
     now = time.time()
     if now - LAST_SYNC_TIME < 300: # Cache de 5 minutos
-        return os.path.exists(COOKIES_FILE)
+        has_cookies = os.path.exists(COOKIES_FILE)
+        return jsonify({'success': has_cookies, 'browser': 'Cache' if has_cookies else '', 'message': 'Operação em cooldown de 5 min.' if not has_cookies else ''})
     
     LAST_SYNC_TIME = now
     success_browser = None
@@ -308,6 +320,7 @@ def get_info():
         print(f"[Analise] Processando URL: {url}")
         
         opts = get_common_opts()
+        opts.pop('format', None) # Remove filtro estrito para apenas analisar metadata
         opts.update({
             'extract_flat': 'in_playlist',
             'noplaylist': False, # Permitir analisar playlists
@@ -322,7 +335,9 @@ def get_info():
                 user_friendly_error = "Erro ao analisar o link."
                 
                 if "confirm you're not a bot" in error_msg:
-                    user_friendly_error = "YouTube bloqueou o acesso (Bot). Cole os COOKIES nas definições."
+                    user_friendly_error = "YouTube bloqueou o acesso (Bot). Use a Sincronização de Cookies nas Definições."
+                elif "Requested format is not available" in error_msg or "Only images are available" in error_msg:
+                    user_friendly_error = "O YouTube bloqueou o vídeo (Proteção Bot). Por favor, vá às Definições e faça Sincronização de Cookies."
                 elif "copyright claim" in error_msg.lower():
                     user_friendly_error = "Vídeo removido por direitos de autor."
                 elif "Video unavailable" in error_msg:
@@ -624,15 +639,16 @@ def get_history():
         rows = cursor.fetchall()
         files = []
         for row in rows:
+            row_keys = row.keys()
             files.append({
                 'id': row['id'],
-                'video_id': row['video_id'],
-                'name': row['filename'],
-                'title': row['title'],
-                'channel': row['channel'],
-                'thumbnail': row['thumbnail'],
-                'date': row['date'],
-                'format': row['format']
+                'video_id': row['video_id'] if 'video_id' in row_keys else '',
+                'name': row['filename'] if 'filename' in row_keys else '',
+                'title': row['title'] if 'title' in row_keys else '',
+                'channel': row['channel'] if 'channel' in row_keys else '',
+                'thumbnail': row['thumbnail'] if 'thumbnail' in row_keys else '',
+                'date': row['date'] if 'date' in row_keys else '',
+                'format': row['format'] if 'format' in row_keys else 'mp4'
             })
         conn.close()
         return jsonify({'files': files, 'current_path': DOWNLOAD_FOLDER})

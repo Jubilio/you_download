@@ -1,6 +1,12 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-netflix-red: #E50914;
+  --color-netflix-black: #141414;
+  --color-netflix-dark: #181818;
+  --color-netflix-grey: #2f2f2f;
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
 
 :root {
   background-color: #141414;

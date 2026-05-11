@@ -1,6 +1,6 @@
 const socket = io({
-    transports: ['polling', 'websocket'],
-    upgrade: true
+    transports: ['polling'],
+    upgrade: false
 });
 
 const taskGrid = document.getElementById('task-grid');
