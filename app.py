@@ -61,7 +61,7 @@ def get_resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 def get_static_path():
-    return get_resource_path('frontend')
+    return get_resource_path('frontend_react/dist')
 
 app = Flask(__name__, static_folder=get_static_path(), static_url_path='')
 CORS(app)
@@ -432,6 +432,7 @@ def add_to_history_db(video_id, title, channel, thumbnail, filename, file_path, 
 def download_single():
     data = request.json
     url, video_id, format_type, playlist_title = data.get('url'), data.get('id'), data.get('format', 'mp4'), data.get('playlist_title', '')
+    playlist_index = data.get('index')
     # Metadados adicionais passados pelo frontend para o DB
     title_hint = data.get('title', 'Vídeo')
     channel_hint = data.get('channel', 'Canal')
@@ -439,7 +440,13 @@ def download_single():
 
     def run_download():
         try:
-            socketio.emit('progress', {'id': video_id, 'percent': 0, 'status': 'starting'})
+            socketio.emit('progress', {
+                'id': video_id, 
+                'percent': 0, 
+                'status': 'starting',
+                'title': title_hint,
+                'thumbnail': thumb_hint
+            })
             
             # Sanitização e criação de subpasta para playlists
             subfolder = ""
@@ -449,7 +456,11 @@ def download_single():
                 subfolder = f"{clean_title}/"
                 os.makedirs(os.path.join(DOWNLOAD_FOLDER, clean_title), exist_ok=True)
 
-            out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"{subfolder}%(playlist_index&{{:02d}} - |)s%(title)s.%(ext)s")
+            if playlist_index:
+                # Usa o índice enviado pelo frontend para garantir a mesma ordenação
+                out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"{subfolder}{int(playlist_index):02d} - %(title)s.%(ext)s")
+            else:
+                out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"{subfolder}%(title)s.%(ext)s")
             
             # Engine Robusta Definitiva: bv*[ext=mp4]+ba[ext=m4a]/b
             # Prioriza H.264 e AAC para compatibilidade total
@@ -570,7 +581,13 @@ def download_section():
     
     def run_download():
         try:
-            socketio.emit('progress', {'id': section_id, 'percent': 0, 'status': 'starting'})
+            socketio.emit('progress', {
+                'id': section_id, 
+                'percent': 0, 
+                'status': 'starting',
+                'title': f"Recorte: {title}",
+                'thumbnail': data.get('thumbnail', '')
+            })
             out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"%(title)s - {title}.%(ext)s")
             
             # Engine Robusta Definitiva: bv*[ext=mp4]+ba[ext=m4a]/b

@@ -1,15 +1,17 @@
 @import "tailwindcss";
 
 @theme {
-  --color-netflix-red: #E50914;
-  --color-netflix-black: #141414;
-  --color-netflix-dark: #181818;
-  --color-netflix-grey: #2f2f2f;
+  --color-yd-primary: #6366F1;
+  --color-yd-primary-dark: #4F46E5;
+  --color-yd-accent: #818CF8;
+  --color-yd-black: #0A0A0F;
+  --color-yd-dark: #12121A;
+  --color-yd-grey: #1E1E2E;
   --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 :root {
-  background-color: #141414;
+  background-color: #0A0A0F;
   color: white;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
@@ -24,29 +26,29 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #141414;
+  background: #0A0A0F;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2f2f2f;
+  background: #1E1E2E;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #E50914;
+  background: #6366F1;
 }
 
 /* Glassmorphism utility */
 .glass {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.netflix-shadow {
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+.yd-shadow {
+  box-shadow: 0 0 30px rgba(99, 102, 241, 0.15), 0 0 20px rgba(0, 0, 0, 0.5);
 }
 
 .gradient-overlay {
-  background: linear-gradient(to top, #141414 0%, transparent 100%);
+  background: linear-gradient(to top, #0A0A0F 0%, transparent 100%);
 }

@@ -7,11 +7,13 @@ export default {
   theme: {
     extend: {
       colors: {
-        netflix: {
-          red: '#E50914',
-          black: '#141414',
-          dark: '#181818',
-          grey: '#2f2f2f',
+        yd: {
+          primary: '#6366F1',
+          'primary-dark': '#4F46E5',
+          accent: '#818CF8',
+          black: '#0A0A0F',
+          dark: '#12121A',
+          grey: '#1E1E2E',
         }
       },
       animation: {
