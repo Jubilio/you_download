@@ -12,22 +12,17 @@ import re
 import traceback
 import browser_cookie3
 import http.cookiejar
-
-# --- FORÇAR RECONHECIMENTO DO NODE.JS ---
-# Se o Node.js foi instalado mas o terminal não foi reiniciado, isto injeta-o no PATH para o yt-dlp o encontrar
-node_paths = [
-    r"C:\Program Files\nodejs",
-    r"C:\Program Files (x86)\nodejs"
-]
-current_path = os.environ.get('PATH', '')
-for p in node_paths:
-    if os.path.exists(p) and p not in current_path:
-        os.environ['PATH'] = f"{p};{current_path}"
-        print(f"[System] Node.js adicionado ao PATH: {p}")
-
+import platform
 import sys
 import queue
 import sqlite3
+
+# --- INJEÇÃO DE DEPENDÊNCIAS (WINDOWS) ---
+if platform.system() == 'Windows':
+    node_paths = [r"C:\Program Files\nodejs", r"C:\Program Files (x86)\nodejs"]
+    for p in node_paths:
+        if os.path.exists(p) and p not in os.environ.get('PATH', ''):
+            os.environ['PATH'] = f"{p};{os.environ.get('PATH', '')}"
 
 DB_PATH = os.path.join(os.getcwd(), 'history.db')
 
@@ -60,11 +55,34 @@ def get_resource_path(relative_path):
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
+def open_path(path):
+    """Abre um ficheiro ou pasta de forma multiplataforma."""
+    try:
+        if platform.system() == 'Windows':
+            os.startfile(path)
+        elif platform.system() == 'Darwin': # macOS
+            subprocess.Popen(['open', path])
+        else: # Linux e outros
+            subprocess.Popen(['xdg-open', path])
+        return True
+    except Exception as e:
+        print(f"[System Error] Erro ao abrir caminho: {str(e)}")
+        return False
+
 def get_static_path():
     return get_resource_path('frontend_react/dist')
 
 app = Flask(__name__, static_folder=get_static_path(), static_url_path='')
 CORS(app)
+
+@app.route('/')
+def index():
+    return app.send_static_file('index.html')
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return app.send_static_file('index.html')
+
 # Usando async_mode='threading' para eliminar dependência do Eventlet (deprecated)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
@@ -183,8 +201,8 @@ def get_common_opts():
         'ignoreerrors': False, # Queremos ver os erros para tratar
         
         # 🔥 A SOLUÇÃO DEFINITIVA PARA O CODEC (Adeus AV1/Freeze)
-        # Prioriza H.264 (avc1) e Áudio M4A (AAC) para compatibilidade total e sem travamentos
-        'format': 'bestvideo[vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        # Prioriza H.264 (avc1) e Áudio M4A (AAC) até 720p para compatibilidade total
+        'format': 'bestvideo[height<=720][vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best',
         'merge_output_format': 'mp4',
         
         # 🔥 SOLUÇÃO PARA "n challenge" e PLAYER JS
@@ -462,9 +480,9 @@ def download_single():
             else:
                 out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"{subfolder}%(title)s.%(ext)s")
             
-            # Engine Robusta Definitiva: bv*[ext=mp4]+ba[ext=m4a]/b
-            # Prioriza H.264 e AAC para compatibilidade total
-            format_str = 'bv*[ext=mp4]+ba[ext=m4a]/b' if format_type == 'mp4' else 'ba/b'
+            # Engine Robusta Definitiva: bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720]
+            # Prioriza H.264 e AAC até 720p para compatibilidade e velocidade
+            format_str = 'bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720]' if format_type == 'mp4' else 'ba/b'
             
             ydl_opts = {
                 **get_common_opts(), 
@@ -551,8 +569,9 @@ def cancel_download():
 @app.route('/api/install-ffmpeg', methods=['POST'])
 def install_ffmpeg():
     """Tenta instalar o FFmpeg automaticamente usando o Winget."""
+    if platform.system() != 'Windows':
+        return jsonify({'success': False, 'message': 'A instalação automática via winget só está disponível no Windows.'})
     try:
-        # Usa o comando nativo do Windows (Winget) para instalar o FFmpeg
         subprocess.run(['winget', 'install', 'ffmpeg', '--source', 'winget', '--accept-package-agreements', '--accept-source-agreements'], check=True)
         global HAS_FFMPEG
         HAS_FFMPEG = check_ffmpeg() # Re-verifica
@@ -691,20 +710,40 @@ def select_folder():
         return jsonify({'success': False})
     except Exception as e: return jsonify({'error': str(e)}), 500
 
-@app.route('/api/play', methods=['POST'])
+@app.route('/api/execute-play', methods=['POST'])
 def play_video():
     data = request.json
     file_path = data.get('file_path')
+    print(f"[DEBUG] Rota /api/execute-play chamada para: {file_path}")
+    
+    # 1. Tenta o caminho exato (mais rápido)
     if file_path and os.path.exists(file_path):
-        try:
-            os.startfile(file_path)
+        if open_path(file_path):
             return jsonify({'success': True})
-        except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
-    return jsonify({'success': False, 'message': 'Ficheiro não encontrado ou caminho inválido.'}), 404
+            
+    # 2. Fallback: Se o caminho absoluto falhou (ex: pasta movida ou app reiniciado),
+    # procura pelo nome do ficheiro dentro da pasta de downloads atual.
+    if file_path:
+        filename = os.path.basename(file_path)
+        print(f"[Play] Ficheiro não encontrado no caminho original. A procurar por '{filename}' em {DOWNLOAD_FOLDER}...")
+        
+        for root, dirs, files in os.walk(DOWNLOAD_FOLDER):
+            if filename in files:
+                new_path = os.path.join(root, filename)
+                print(f"[Play] Ficheiro encontrado em: {new_path}")
+                if open_path(new_path):
+                    return jsonify({'success': True})
+
+    return jsonify({
+        'success': False, 
+        'message': f'Ficheiro não encontrado: {os.path.basename(file_path) if file_path else "---"}. Verifique se o ficheiro ainda existe na pasta de downloads.'
+    }), 404
 
 @app.route('/api/open-folder', methods=['POST'])
-def open_folder(): subprocess.Popen(f'explorer "{DOWNLOAD_FOLDER}"'); return jsonify({'success': True})
+def open_folder(): 
+    if open_path(DOWNLOAD_FOLDER):
+        return jsonify({'success': True})
+    return jsonify({'success': False}), 500
 
 @app.route('/api/delete', methods=['POST'])
 def delete_file():
@@ -765,8 +804,7 @@ def stream_file(filename):
                 
     return "Ficheiro não encontrado", 404
 
-@app.route('/')
-def index(): return app.send_static_file('index.html')
+
 
 def task_worker():
     """Worker que processa a fila de downloads de forma controlada."""
@@ -787,17 +825,29 @@ if __name__ == '__main__':
     # Iniciar worker em background
     threading.Thread(target=task_worker, daemon=True).start()
 
-    # Configuração de Host: 127.0.0.1 para local (seguro), 0.0.0.0 para Docker/Nuvem
     is_frozen = getattr(sys, 'frozen', False)
-    host_addr = '127.0.0.1' if is_frozen else '0.0.0.0'
+    host_addr = '127.0.0.1'
     
-    # Abrir o browser automaticamente apenas se estiver no modo executável
-    if is_frozen:
-        import webbrowser
-        from threading import Timer
-        def open_browser():
-            webbrowser.open("http://127.0.0.1:5000/installer")
-        Timer(2.5, open_browser).start()
+    # Se estivermos no modo Desktop (com pywebview)
+    try:
+        import webview
+        print("[Desktop] Iniciando YouDown Pro em modo nativo...")
+        print("\n[DEBUG] Rotas Flask Registadas:")
+        print(app.url_map)
+        print("\n")
         
-    # Desativar debug para evitar que o Flask reinicie e mate as tarefas de download
-    socketio.run(app, debug=False, host=host_addr, port=5000)
+        t = threading.Thread(target=lambda: socketio.run(app, host=host_addr, port=5000, debug=False, use_reloader=False))
+        t.daemon = True
+        t.start()
+        
+        webview.create_window('YouDown Pro', 'http://127.0.0.1:5000', width=1280, height=800, background_color='#141414')
+        webview.start()
+    except ImportError:
+        # Modo Fallback: Servidor Flask padrão + Browser
+        print("[Server] PyWebView não instalado. Iniciando modo navegador...")
+        if is_frozen:
+            import webbrowser
+            from threading import Timer
+            Timer(2.5, lambda: webbrowser.open("http://127.0.0.1:5000")).start()
+        
+        socketio.run(app, host=host_addr, port=5000, debug=not is_frozen)

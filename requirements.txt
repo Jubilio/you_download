@@ -1,5 +1,10 @@
-Flask>=3.0.0
-flask-cors>=4.0.0
-yt-dlp>=2024.3.10
-requests>=2.31.0
-browser-cookie3>=0.19.1
+flask
+flask-cors
+flask-socketio
+yt-dlp
+browser-cookie3
+pywebview
+pyinstaller
+requests
+python-socketio
+eventlet

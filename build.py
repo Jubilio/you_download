@@ -1,51 +1,40 @@
+import PyInstaller.__main__
 import os
-import subprocess
-import sys
 import shutil
+import platform
 
 def build():
-    print("==========================================")
-    print("   YouDown - Compilador para Executável   ")
-    print("==========================================")
-    
-    # 1. Garantir que o PyInstaller está instalado
-    try:
-        import PyInstaller
-    except ImportError:
-        print("[!] PyInstaller não encontrado. Instalando...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
+    # 1. Limpar pastas anteriores
+    for folder in ['build', 'dist']:
+        if os.path.exists(folder):
+            shutil.rmtree(folder)
 
-    # 2. Definir o comando
-    # --onefile: um único .exe
-    # --windowed: sem janela de terminal (substitua por --console se quiser ver logs)
-    # --add-data: inclui a pasta frontend
-    # --hidden-import: garante que dependências dinâmicas sejam incluídas
+    print(f"🚀 Iniciando build para {platform.system()}...")
+
+    # 2. Configuração do PyInstaller
+    # --add-data: Inclui o frontend_react/dist e outros ficheiros necessários
+    # No Windows usa ; como separador, no Linux/Mac usa :
+    sep = ';' if platform.system() == 'Windows' else ':'
     
-    separator = ";" if os.name == 'nt' else ":"
-    
-    cmd = [
-        "pyinstaller",
-        "--noconfirm",
-        "--onefile",
-        "--console", # Mudamos para console para você ver o erro se ele fechar sozinho
-        "--icon", "youdown_logo_icon.ico",
-        "--name", "YouDown_NexoVibe",
-        f"--add-data=frontend{separator}frontend",
-        f"--add-data=installer.html{separator}.", # Incluindo o instalador explicitamente
-        "--hidden-import=browser_cookie3",
-        "--hidden-import=yt_dlp",
-        "app.py"
+    params = [
+        'app.py',
+        '--name=YouDownPro',
+        '--onefile',
+        '--windowed',
+        f'--add-data=frontend_react/dist{sep}frontend_react/dist',
+        f'--add-data=installer.html{sep}.',
+        '--icon=frontend_react/public/favicon.png', # Pode ser .ico no windows
+        '--hidden-import=engineio.async_drivers.threading',
+        '--hidden-import=webview.platforms.winforms', # Para Windows
     ]
 
-    print(f"\n[2/3] Iniciando compilação (isso pode demorar alguns minutos)...")
-    try:
-        subprocess.check_call(cmd)
-        print("\n==========================================")
-        print("   Compilação concluída com sucesso!     ")
-        print(f"   O executável está em: {os.path.join(os.getcwd(), 'dist')}")
-        print("==========================================")
-    except Exception as e:
-        print(f"\n[!] Erro durante a compilação: {e}")
+    PyInstaller.__main__.run(params)
+    print("\n✅ Build concluído! O executável está na pasta 'dist'.")
 
-if __name__ == "__main__":
-    build()
+if __name__ == '__main__':
+    # Certifique-se de que o frontend_react/dist existe
+    if not os.path.exists('frontend_react/dist'):
+        print("❌ Erro: Pasta 'frontend_react/dist' não encontrada.")
+        print("Execute 'npm run build' dentro de 'frontend_react' primeiro.")
+    else:
+        build()

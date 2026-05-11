@@ -129,6 +129,30 @@ export default function App() {
     return links;
   };
 
+  const renderDescription = (text) => {
+    if (!text) return "Sem descrição disponível.";
+    // Regex para detetar URLs de forma segura
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    
+    return parts.map((part, i) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a 
+            key={i} 
+            href={part} 
+            target="_blank" 
+            rel="noreferrer" 
+            className="text-yd-primary hover:text-yd-primary/80 hover:underline transition-all break-all"
+          >
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
+  };
+
   const analyzeUrl = async (targetUrl) => {
     setUrl(targetUrl);
     setAnalyzing(true);
@@ -413,7 +437,7 @@ export default function App() {
                     <section>
                       <h4 className="text-sm font-bold text-yd-primary uppercase tracking-widest mb-4">Descrição</h4>
                       <div className="bg-black/50 border border-white/10 p-6 rounded-2xl text-sm text-white/70 leading-relaxed whitespace-pre-wrap font-sans">
-                        {videoInfo?.description || "Sem descrição disponível."}
+                        {renderDescription(videoInfo?.description)}
                       </div>
                     </section>
                   </div>
@@ -467,7 +491,7 @@ function HistoryView({ notify }) {
 
   const playVideo = async (file_path) => {
     try {
-      const res = await axios.post(`${API_BASE}/api/play`, { file_path });
+      const res = await axios.post(`${API_BASE}/api/execute-play`, { file_path });
       if (!res.data.success) notify("Erro", res.data.message || "Não foi possível abrir o vídeo.", "error");
     } catch (e) {
       notify("Erro", "Erro ao tentar abrir o ficheiro.", "error");
