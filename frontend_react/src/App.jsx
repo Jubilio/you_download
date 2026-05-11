@@ -4,7 +4,8 @@ import axios from 'axios';
 import { 
   Download, Search, History as HistoryIcon, Settings as SettingsIcon, 
   Play, X, AlertCircle, CheckCircle, Clock, Zap, Terminal as TerminalIcon, 
-  ChevronRight, Trash2, RefreshCw, FolderOpen, FileCheck, Scissors, Music
+  ChevronRight, Trash2, RefreshCw, FolderOpen, FileCheck, Scissors, Music,
+  Bookmark, ListVideo
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -82,6 +83,73 @@ export default function App() {
       setShowCut(false);
     } catch (e) {
       alert("Erro ao cortar vídeo.");
+    }
+  };
+
+  const formatTime = (seconds) => {
+    if (!seconds) return '00:00';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    return [h, m, s].map(v => v.toString().padStart(2, '0')).filter((v, i) => v !== '00' || i > 0).join(':');
+  };
+
+  const processChapterCut = async (start, end, name) => {
+    try {
+      await axios.post(`${API_BASE}/api/download-section`, {
+        url: videoInfo.url || videoInfo.webpage_url,
+        id: videoInfo.id,
+        start, end, title: name
+      });
+    } catch (e) {
+      alert("Erro ao cortar vídeo.");
+    }
+  };
+
+  const analyzeUrl = async (targetUrl) => {
+    setUrl(targetUrl);
+    setAnalyzing(true);
+    setVideoInfo(null);
+    setShowCut(false);
+    try {
+      const res = await axios.post(`${API_BASE}/api/info`, { url: targetUrl });
+      setVideoInfo(res.data);
+    } catch (err) {
+      alert(err.response?.data?.error || "Erro ao analisar URL");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const [selectedPlaylist, setSelectedPlaylist] = useState(new Set());
+  
+  useEffect(() => {
+    if (videoInfo && videoInfo.entries) {
+      setSelectedPlaylist(new Set(videoInfo.entries.map((_, i) => i)));
+    } else {
+      setSelectedPlaylist(new Set());
+    }
+  }, [videoInfo]);
+
+  const downloadPlaylist = async () => {
+    if (!videoInfo || !videoInfo.entries) return;
+    const playlistTitle = videoInfo.title || "Playlist";
+    const selectedIndices = Array.from(selectedPlaylist);
+    if (selectedIndices.length === 0) return alert("Selecione pelo menos um vídeo.");
+    
+    for (const index of selectedIndices) {
+      const entry = videoInfo.entries[index];
+      try {
+        await axios.post(`${API_BASE}/api/download-single`, {
+          url: entry.url,
+          id: entry.id,
+          format: 'mp4',
+          title: entry.title,
+          thumbnail: entry.thumbnail,
+          channel: entry.channel,
+          playlist_title: playlistTitle
+        });
+      } catch (err) {}
     }
   };
 
@@ -167,6 +235,64 @@ export default function App() {
                   </motion.section>
                 )}
               </AnimatePresence>
+
+              {videoInfo?.chapters?.length > 0 && (
+                <section className="mb-12">
+                  <h2 className="text-2xl font-bold mb-6 flex items-center gap-3"><Bookmark className="text-netflix-red" /> CENAS DETETADAS</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {videoInfo.chapters.map((ch, i) => (
+                      <div key={i} className="glass rounded-2xl p-6 flex flex-col justify-between">
+                        <div>
+                          <p className="text-netflix-red font-mono text-sm mb-2">{formatTime(ch.start_time)} - {formatTime(ch.end_time)}</p>
+                          <h3 className="font-bold text-lg mb-4">{ch.title}</h3>
+                        </div>
+                        <button onClick={() => processChapterCut(ch.start_time, ch.end_time, ch.title)} className="bg-white/10 hover:bg-white/20 text-white w-full py-2 rounded-lg font-bold flex items-center justify-center gap-2 transition-colors mt-4">
+                          <Scissors size={18} /> RECORTAR CENA
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {videoInfo?.entries?.length > 0 && (
+                <section className="mb-12">
+                  <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+                    <h2 className="text-2xl font-bold flex items-center gap-3"><ListVideo className="text-netflix-red" /> VÍDEOS DA PLAYLIST</h2>
+                    <div className="flex gap-4">
+                      <button onClick={() => {
+                        if (selectedPlaylist.size === videoInfo.entries.length) setSelectedPlaylist(new Set());
+                        else setSelectedPlaylist(new Set(videoInfo.entries.map((_, i) => i)));
+                      }} className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg font-bold text-sm transition-colors">
+                        Selecionar Tudo
+                      </button>
+                      <button onClick={downloadPlaylist} className="bg-netflix-red hover:bg-red-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors">
+                        <Download size={16} /> Baixar Selecionados
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {videoInfo.entries.map((entry, i) => (
+                      <div key={i} className="glass rounded-xl p-4 flex items-center gap-4">
+                        <input type="checkbox" checked={selectedPlaylist.has(i)} onChange={() => {
+                          const next = new Set(selectedPlaylist);
+                          if (next.has(i)) next.delete(i);
+                          else next.add(i);
+                          setSelectedPlaylist(next);
+                        }} className="w-5 h-5 accent-netflix-red shrink-0" />
+                        <img src={entry.thumbnail || '/favicon.png'} className="w-20 h-14 object-cover rounded-lg shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-bold truncate text-sm">{entry.title}</h4>
+                          <p className="text-xs text-white/50 truncate">{entry.channel}</p>
+                        </div>
+                        <button onClick={() => analyzeUrl(entry.url)} className="p-2 hover:bg-white/10 rounded-lg text-white/50 hover:text-white transition-colors shrink-0" title="Analisar este vídeo">
+                          <Search size={18} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
 
               <section className="mb-12">
                 <h2 className="text-2xl font-bold mb-6 flex items-center gap-3"><Zap className="text-netflix-red" /> TRANSFERÊNCIAS EM CURSO</h2>

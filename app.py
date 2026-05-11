@@ -210,6 +210,7 @@ def get_common_opts():
         'geo_bypass': True,
         'hls_prefer_native': True,
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'continuedl': False, # Resolve o erro 416: Requested range not satisfiable (força reiniciar em vez de falhar no resume)
     }
     
     if os.path.exists(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 0:
@@ -459,7 +460,6 @@ def download_single():
                 'format': format_str, 
                 'outtmpl': out_tmpl, 
                 'merge_output_format': 'mp4' if format_type == 'mp4' else None, 
-                'nopart': True, 
                 'restrictfilenames': True,
                 'progress_hooks': [make_progress_hook(video_id)],
                 'logger': YDLProgressLogger(video_id),
@@ -579,7 +579,6 @@ def download_section():
                 'download_archive': None, 
                 'outtmpl': out_tmpl, 
                 'force_keyframes_at_cuts': True,
-                'nopart': True,
                 'download_ranges': lambda info, ydl: [{
                     'start_time': float(start),
                     'end_time': float(end)
