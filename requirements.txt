@@ -9,3 +9,4 @@ requests
 python-socketio
 eventlet
 pywin32
+pywebview

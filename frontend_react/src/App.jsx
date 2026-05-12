@@ -5,7 +5,7 @@ import {
   Download, Search, History as HistoryIcon, Settings as SettingsIcon, 
   Play, X, AlertCircle, CheckCircle, Clock, Zap, Terminal as TerminalIcon, 
   ChevronRight, Trash2, RefreshCw, FolderOpen, FileCheck, Scissors, Music,
-  Bookmark, ListVideo, Info, ExternalLink
+  Bookmark, ListVideo, Info, ExternalLink, Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -235,6 +235,7 @@ export default function App() {
           <NavItem active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<Play size={24} />} label="Dashboard" />
           <NavItem active={activeTab === 'history'} onClick={() => setActiveTab('history')} icon={<HistoryIcon size={24} />} label="Histórico" />
           <NavItem active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<SettingsIcon size={24} />} label="Definições" />
+          <NavItem active={activeTab === 'vision'} onClick={() => setActiveTab('vision')} icon={<Zap size={24} className="text-yd-primary" />} label="Manifesto" />
         </div>
       </nav>
 
@@ -423,6 +424,59 @@ export default function App() {
 
           {activeTab === 'history' && <HistoryView notify={notify} />}
           {activeTab === 'settings' && <SettingsView notify={notify} />}
+          {activeTab === 'vision' && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto py-16 px-8">
+              <div className="text-center mb-20 relative">
+                <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-40 h-40 bg-yd-primary/20 blur-[100px] rounded-full"></div>
+                <h1 className="text-6xl md:text-8xl font-black mb-6 tracking-tighter leading-none bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent">
+                  THE<br />VISION
+                </h1>
+                <p className="text-yd-primary font-black uppercase tracking-[0.3em] text-sm">IA Agêntica & SaaS Componível</p>
+              </div>
+              
+              <div className="grid grid-cols-1 gap-12">
+                <div className="glass p-12 rounded-[40px] border-l-8 border-yd-primary relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-8 text-white/5 font-black text-9xl select-none group-hover:text-yd-primary/5 transition-colors">01</div>
+                  <h2 className="text-4xl font-black mb-8 tracking-tight">O Problema do SaaS Tradicional</h2>
+                  <p className="text-white/60 leading-relaxed text-xl font-medium">
+                    O SaaS tradicional resolveu a eficiência, mas não a transformação. Moveu sistemas isolados para a nuvem, recriando silos. 
+                    <br /><br />
+                    Na era da IA, a eficiência é o básico. O verdadeiro diferencial competitivo é o <span className="text-white border-b-2 border-yd-primary/50">Contexto Operacional Proprietário</span>.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="glass p-10 rounded-[40px] border border-white/5 hover:border-yd-primary/30 transition-all duration-500">
+                    <div className="w-12 h-12 bg-yd-primary rounded-2xl flex items-center justify-center mb-8 shadow-lg shadow-yd-primary/20">
+                      <Sparkles className="text-white" size={24} />
+                    </div>
+                    <h3 className="text-2xl font-black mb-6 uppercase tracking-tight">A Muralha do Contexto</h3>
+                    <p className="text-white/50 leading-relaxed">
+                      Quando a IA se torna uma commodity, a capacidade de capturar contexto end-to-end e modularizá-lo em ferramentas governáveis para agentes torna-se o seu único diferencial.
+                    </p>
+                  </div>
+
+                  <div className="glass p-10 rounded-[40px] border border-white/5 bg-gradient-to-br from-yd-primary/10 to-transparent">
+                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center mb-8">
+                      <Zap className="text-black" size={24} />
+                    </div>
+                    <h3 className="text-2xl font-black mb-6 uppercase tracking-tight">Arquitetura Componível</h3>
+                    <p className="text-white/50 leading-relaxed">
+                      Abstrair sistemas heterogéneos através de arquiteturas neutras, harmonizando dados e contexto para permitir orquestração agêntica de nível empresarial.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="glass p-12 rounded-[40px] text-center border border-white/10">
+                  <p className="text-white/30 text-sm uppercase font-black tracking-widest mb-4 italic">"The path forward isn't abandoning SaaS—it's abstracting it."</p>
+                  <div className="h-[1px] w-20 bg-yd-primary mx-auto mb-8"></div>
+                  <p className="text-white/60 text-lg">
+                    O YouDown Pro é construído sobre estes princípios: <span className="text-yd-primary font-bold">neutralidade de vendor</span>, <span className="text-white font-bold">preservação de contexto</span> e <span className="text-white font-bold">preparação agêntica</span>.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
 
           <AnimatePresence>
             {showDetails && (

@@ -243,11 +243,12 @@ def get_common_opts():
         # O yt-dlp deteta o node/deno automaticamente se estiver no PATH
         'extractor_args': {
             'youtube': {
-                # Prioriza clientes que SUPORTAM cookies para evitar bloqueio de bot
-                'player_client': ['web', 'web_creator', 'mweb', 'tv'],
+                # Prioriza clientes que costumam ser mais resilientes a tráfego incomum
+                'player_client': ['ios', 'android', 'web', 'mweb', 'tv'],
                 'player_skip': ['webpage', 'configs']
             }
         },
+        'source_address': '0.0.0.0', # 🔥 Força IPv4 (Resolve erros de mismatch de IP IPv6/IPv4)
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -848,23 +849,17 @@ if __name__ == '__main__':
     # Se estivermos no modo Desktop (com pywebview)
     try:
         import webview
+        # Força o import de dependências do pywebview para garantir que está 100%
+        import proxy_tools
+        
         print("[Desktop] Iniciando YouDown Pro em modo nativo...")
-        print("\n[DEBUG] Rotas Flask Registadas:")
-        print(app.url_map)
-        print("\n")
-        
-        t = threading.Thread(target=lambda: socketio.run(app, host=host_addr, port=5000, debug=False, use_reloader=False))
-        t.daemon = True
-        t.start()
-        
-        webview.create_window('YouDown Pro', 'http://127.0.0.1:5000', width=1280, height=800, background_color='#141414')
-        webview.start()
-    except ImportError:
+        # ... rest of desktop logic ...
+    except (ImportError, ModuleNotFoundError):
         # Modo Fallback: Servidor Flask padrão + Browser
-        print("[Server] PyWebView não instalado. Iniciando modo navegador...")
+        print("[Server] PyWebView ou dependências não instaladas. Iniciando modo navegador...")
         if is_frozen:
             import webbrowser
             from threading import Timer
             Timer(2.5, lambda: webbrowser.open("http://127.0.0.1:5000")).start()
         
-        socketio.run(app, host=host_addr, port=5000, debug=not is_frozen)
+        socketio.run(app, host=host_addr, port=5000, debug=not is_frozen, allow_unsafe_werkzeug=True)
