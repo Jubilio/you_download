@@ -3,10 +3,8 @@ flask-cors
 flask-socketio
 yt-dlp
 browser-cookie3
-pywebview
 pyinstaller
 requests
 python-socketio
 eventlet
 pywin32
-pywebview

@@ -1,175 +1,95 @@
-# 📥 YouDown - Media Dashboard Premium
+# 📥 YouDown Pro - The Ultimate Media Pipeline
 by **[NexoVibe](https://nexovibe.netlify.app/)**
 
-Um ecossistema de elite para gestão e extração de média do YouTube. Projetado com estética **Glassmorphism 2.0**, o YouDown transforma vídeos longos em bibliotecas organizadas através de ferramentas de precisão cirúrgica.
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
+![React](https://img.shields.io/badge/React-18-61dafb.svg)
+![Status](https://img.shields.io/badge/Status-Production--Ready-brightgreen.svg)
+
+**YouDown Pro** is a high-performance, professional-grade media extraction engine designed for the age of **Agentic AI**. Built with a futuristic **Glassmorphism 2.0** interface, it transforms media consumption into a structured, governed, and high-speed data pipeline.
 
 ---
 
-## ✨ Características de Elite
+## 🏛️ The Vision
+In a world moving towards **Agentic AI**, your proprietary operational context is your only moat. YouDown Pro is designed to be more than a downloader; it is a **Composable Architecture** layer that:
+- **Abstracts SaaS Silos**: Uses vendor-neutral engines (yt-dlp) to ensure data sovereignty.
+- **Preserves Context**: Maintains rich metadata, chapters, and history for AI-driven analysis.
+- **Modularizes Logic**: Separates extraction, processing, and UI for seamless evolution.
 
-- ✂️ **Smart Clipping & TOC**: Detete capítulos automaticamente ou cole um índice completo para recortar vídeos longos (ex: aulas de 10h+) em minutos.
-- 🚀 **Surgical Cut Engine**: Utiliza FFmpeg para extrair apenas os fragmentos necessários, sem baixar o vídeo original completo.
-- 🎨 **Interface NexoVibe**: Design futurista com modo escuro, desfoques dinâmicos e micro-animações premium.
-- 🍪 **Smart Cookie Sync**: Sincronização segura com navegadores locais para acesso a conteúdos restritos.
-- 🔗 **Auto-Resource Extraction**: Identifica links de Drive, Mega e PDF nas descrições e organiza-os para acesso rápido.
-- 🛠️ **Setup Wizard**: Interface de instalação dedicada (`/installer`) para configuração automática de requisitos.
+*Read more in our [Manifesto](VISION.md).*
 
 ---
 
-## 🚀 Como Começar
+## ✨ Elite Features
 
-### 1. Requisitos do Core
-- **Python 3.9+**
-- **FFmpeg** (Obrigatório para a função de recortes).
-    - *Dica: Use a nossa interface de instalação para configurar o FFmpeg automaticamente.*
+- 🏎️ **Parallel Download Engine**: Multi-threaded execution via `ThreadPoolExecutor` allowing up to 3 concurrent downloads.
+- 🎯 **Dynamic Quality Selector**: Auto-detects available resolutions (1080p, 4K, 2K) and allows surgical selection before download.
+- ✂️ **Surgical Clipping**: High-precision FFmpeg range extraction—download only what you need, even from 10-hour videos.
+- 🖼️ **Pro Metadata Embedding**: Automatically embeds video thumbnails, chapters, and tags into the final MP4/MP3 files.
+- 🍪 **Smart Cookie Sync**: One-click synchronization with local browsers (Edge, Chrome) to bypass bot detection and access private content.
+- 🔔 **Native Notifications**: Real-time desktop alerts when tasks are completed or require attention.
+- 🔗 **Resource Auto-Extraction**: Automatically identifies Drive, Mega, and PDF links in video descriptions.
 
-### 2. Execução via Código
+---
+
+## 🛠️ Technology Stack
+
+- **Frontend**: React 18, Tailwind CSS, Framer Motion (Glassmorphism 2.0).
+- **Backend**: Python 3.12, Flask, Flask-SocketIO (Real-time progress).
+- **Engine**: yt-dlp (Custom production-grade configuration).
+- **Media Processing**: FFmpeg (Atomic clipping and metadata merging).
+
+---
+
+## 🚀 Installation & Setup
+
+### Quick Start (Windows)
+1. Ensure you have [Node.js](https://nodejs.org/) installed (required for YouTube challenge solving).
+2. Run `setup.bat`. This will:
+   - Create a virtual environment (`.env`).
+   - Install all Python dependencies.
+   - Start the backend server.
+3. Access the dashboard at [http://127.0.0.1:5000](http://127.0.0.1:5000).
+
+### Manual Setup
 ```bash
-# Instalar dependências
-pip install -r requirements.txt
-
-# Iniciar servidor
-python app.py
-```
-Acesse: `http://127.0.0.1:5000/installer`
-
-### 3. Gerar o Executável (.exe)
-Para distribuir o YouDown como um app standalone:
-1. Garanta que o ícone `youdown_logo_icon.ico` está na raiz.
-2. Execute o script de build:
-   ```bash
-   python build.py
-   ```
-3. O ficheiro final estará em `dist/YouDown_NexoVibe.exe`.
-
----
-
-## 🎯 Guia de Clipping (Recortes)
-
-Para extrair aulas específicas de um vídeo longo:
-1. Analise o vídeo no dashboard.
-2. No painel **TOC (Table of Contents)**, cole a lista de tempos (ex: `0:00 Aula 1`).
-3. Clique em **Processar Índice**. O sistema irá fatiar o vídeo e baixar cada aula individualmente com o nome correto.
-
----
-
-## 📋 Estrutura do Projeto
-
-```text
-you_down/
-├── app.py                 # Backend Core & API
-├── build.py               # Script de Compilação Standalone
-├── installer.html         # Interface de Onboarding Futurista
-├── frontend/              # Assets da Dashboard
-│   ├── index.html         # UI Principal
-│   ├── style.css          # Design System
-│   └── script.js          # Engine Reativa
-├── downloads/             # Saída de Média (Ignorado pelo Git)
-└── requirements.txt       # Dependências Python
-```
-
----
-
-**Última atualização:** Maio 2026  
-**Desenvolvido com ❤️ por [NexoVibe](https://nexovibe.netlify.app/)**
-
-[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
-[![Flask](https://img.shields.io/badge/Flask-3.0-green.svg)](https://flask.palletsprojects.com/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Estável-brightgreen.svg)]()
-
-Um dashboard desktop-like de última geração para download de mídia do YouTube. Projetado com estética **Glassmorphism 2.0**, o YouDown oferece uma experiência premium, rápida e intuitiva para usuários que buscam qualidade e praticidade.
-
----
-
-## ✨ Características de Elite
-
-- 🚀 **Performance Turbo**: Baixe vídeos e playlists completas com o poder do `yt-dlp`.
-- 🎨 **Interface Futurista**: Design responsivo com efeitos de desfoque, gradientes vibrantes e micro-animações.
-- 🍪 **Smart Cookie Sync**: Sincronização em um clique com cookies do navegador Edge para evitar bloqueios.
-- 📦 **Smart Bundling**: Playlists são automaticamente compactadas em arquivos `.zip` organizados.
-- 🔗 **Resource Extraction**: Identifica e extrai links úteis (Drive, PDF, Mega) diretamente da descrição do vídeo.
-- ✂️ **Smart Clipping**: Deteta automaticamente capítulos em vídeos longos e permite baixar apenas o trecho que lhe interessa.
-- 🔔 **Notificações Modernas**: Alertas elegantes estilo "Toast" e suporte a notificações nativas do sistema.
-- 📂 **Gerenciador de Arquivos**: Visualize, abra pastas e apague downloads diretamente pelo dashboard.
-
----
-
-## 🛠️ Tecnologias
-
-- **Backend**: Python 3.11+, Flask, yt-dlp, browser_cookie3.
-- **Frontend**: Vanilla JavaScript (ES6+), CSS Moderno (Variables, Flexbox, Grid), FontAwesome 6.
-- **Segurança e Ética**:
-    - 🛡️ **Consentimento Explícito**: O YouDown nunca extrai cookies silenciosamente. Toda sincronização exige autorização manual do usuário.
-    - 🔒 **Abordagem Híbrida**: Além da sincronização automática local, o app suporta importação manual via extensão do browser para total controle e privacidade.
-    - 🍪 **Foco em Domínio**: Apenas cookies relacionados ao `youtube.com` são processados.
-
----
-
-## 🚀 Como Começar (Windows)
-
-### ⚡ Método Automático (Recomendado)
-
-O script de setup cuida de tudo: cria o ambiente virtual, instala as dependências e inicia o servidor.
-
-1. Baixe o repositório.
-2. Dê um duplo clique em `setup.bat`.
-3. O servidor abrirá automaticamente em `http://127.0.0.1:5000`.
-
-### 🛠️ Método Manual
-
-```bash
-# 1. Preparar ambiente
+# 1. Environment
 python -m venv .env
-source .env/Scripts/activate
+.\.env\Scripts\activate
 
-# 2. Instalar dependências
+# 2. Dependencies
 pip install -r requirements.txt
 
-# 3. Instalar FFmpeg (Obrigatório para Recortes/Clipping)
-# Windows: winget install ffmpeg
-# Ou baixe em: https://ffmpeg.org/download.html
+# 3. FFmpeg (Essential for clipping)
+winget install ffmpeg
 
-# 4. Rodar aplicação
+# 4. Run
 python app.py
 ```
 
 ---
 
-## 🍪 Configuração de Autenticação
-
-Para vídeos restritos ou para evitar o erro `403 Forbidden`, você pode ativar os cookies de duas formas no Dashboard:
-
-1. **Sincronização Automática**: Clique no ícone de engrenagem e selecione "Sincronizar com Edge". (Certifique-se de que o navegador esteja fechado).
-2. **Drag & Drop**: Arraste seu arquivo `cookies.txt` diretamente para a zona de upload no modal de configurações.
-
----
-
-## 📋 Estrutura do Projeto
-
+## 📋 Project Structure
 ```text
 you_down/
-├── app.py                 # Core Backend (Flask API)
-├── manage_cookies.py      # Utilitário de extração de cookies
-├── frontend/              # Interface do Usuário
-│   ├── index.html         # Layout Base
-│   ├── style.css          # Estilos Glassmorphism
-│   └── script.js          # Lógica Reativa
-├── downloads/             # Pasta padrão de saída (Ignorada pelo Git)
-├── .gitignore             # Configurações de exclusão de repositório
-├── requirements.txt       # Lista de dependências
-└── setup.bat              # Script de automação total
+├── app.py                 # Industrial Backend (API & WebSocket)
+├── VISION.md              # Architectural Manifesto
+├── frontend_react/        # Modern React Dashboard Source
+│   ├── src/               # UI Components & Logic
+│   └── dist/              # Production Build (Served by Flask)
+├── downloads/             # Standard Media Output
+├── history.db             # Local SQLite Context Storage
+└── requirements.txt       # Project Dependencies
 ```
 
 ---
 
-## 🎯 Dicas de Uso
-
-- **MP3 de Alta Qualidade**: O sistema extrai o áudio na melhor qualidade disponível automaticamente ao selecionar o formato MP3.
-- **Troca de Pasta**: Você pode alterar o diretório de download a qualquer momento usando o botão "Alterar Pasta" no dashboard.
-- **Privacidade**: Todos os seus cookies e histórico são armazenados localmente e nunca saem da sua máquina.
+## 🎯 Tips for Pro Users
+- **IPv4 Enforcement**: YouDown Pro forces IPv4 to bypass IP mismatch blocks common in IPv6 environments.
+- **Node.js Integration**: Always keep Node.js updated to ensure the `n-challenge` solver works correctly.
+- **Privacy First**: All history, cookies, and files are stored locally. Your data never leaves your machine.
 
 ---
 
-**Última atualização:** Maio 2026  
-**Desenvolvido com ❤️ por [NexoVibe](https://nexovibe.netlify.app/)**
+**Last Update:** May 2026  
+**Developed with ❤️ by [NexoVibe](https://nexovibe.netlify.app/)**
