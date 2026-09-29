@@ -36,7 +36,10 @@ export default function App() {
   const [cutName, setCutName] = useState('Meu Recorte');
 
   useEffect(() => {
-    socket.on('progress', (data) => setTasks(prev => ({ ...prev, [data.id]: data })));
+    socket.on('progress', (data) => setTasks(prev => ({ 
+      ...prev, 
+      [data.id]: { ...prev[data.id], ...data } 
+    })));
     socket.on('log', (data) => setLogs(prev => [...prev.slice(-100), data]));
     return () => {
       socket.off('progress');

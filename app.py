@@ -196,15 +196,20 @@ def make_progress_hook(task_id):
             speed = clean_ansi(d.get('_speed_str', 'N/A'))
             eta = clean_ansi(d.get('_eta_str', 'N/A'))
             
-            socketio.emit('progress', {
+            payload = {
                 'id': task_id,
                 'percent': round(percent, 1),
                 'speed': speed,
                 'eta': eta,
                 'status': 'downloading'
-            })
+            }
+            # Fix: actualizar progress_store para que /api/progress-all funcione
+            progress_store[task_id] = payload
+            socketio.emit('progress', payload)
         elif status == 'finished':
-            socketio.emit('progress', {'id': task_id, 'percent': 100, 'status': 'processing'})
+            payload = {'id': task_id, 'percent': 100, 'status': 'processing'}
+            progress_store[task_id] = payload
+            socketio.emit('progress', payload)
     return hook
 
 def get_common_opts():
@@ -544,31 +549,69 @@ def show_notification(title, message):
 def run_download(url, video_id, format_type, title_hint, thumb_hint, channel_hint, playlist_title, playlist_index, quality):
     try:
         socketio.emit('progress', {'id': video_id, 'percent': 0, 'status': 'starting', 'title': title_hint, 'thumbnail': thumb_hint})
+        progress_store[video_id] = {'percent': 0, 'status': 'starting', 'title': title_hint, 'thumbnail': thumb_hint}
+        
         subfolder = ""
         if playlist_title:
             clean_title = re.sub(r'[\\/*?:"<>|]', "", playlist_title).strip()
             subfolder = f"{clean_title}/"
             os.makedirs(os.path.join(DOWNLOAD_FOLDER, clean_title), exist_ok=True)
         out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"{subfolder}{int(playlist_index):02d} - %(title)s.%(ext)s" if playlist_index else f"{subfolder}%(title)s.%(ext)s")
+        
+        # Fix: configurar MP3 com FFmpegExtractAudio e MP4 com merge correcto
         if format_type == 'mp4':
             q_val = quality if quality else '720'
-            format_str = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/bestvideo+bestaudio/best' if q_val == 'best' else f'bestvideo[height<={q_val}][ext=mp4]+bestaudio[ext=m4a]/best[height<={q_val}][ext=mp4]/bestvideo+bestaudio/best'
-        else: format_str = 'bestaudio/best'
-        
-        ydl_opts = {**get_common_opts(), 'format': format_str, 'outtmpl': out_tmpl, 'merge_output_format': 'mp4' if format_type == 'mp4' else None, 'restrictfilenames': True, 'progress_hooks': [make_progress_hook(video_id)], 'logger': YDLProgressLogger(video_id)}
-        
+            if q_val == 'best':
+                format_str = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/bestvideo+bestaudio/best'
+            else:
+                format_str = f'bestvideo[height<={q_val}][ext=mp4]+bestaudio[ext=m4a]/best[height<={q_val}][ext=mp4]/bestvideo+bestaudio/best'
+            extra_opts = {'merge_output_format': 'mp4'}
+        else:
+            format_str = 'bestaudio/best'
+            extra_opts = {
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }]
+            }
+
+        ydl_opts = {
+            **get_common_opts(),
+            'format': format_str,
+            'outtmpl': out_tmpl,
+            'restrictfilenames': True,
+            'progress_hooks': [make_progress_hook(video_id)],
+            'logger': YDLProgressLogger(video_id),
+            **extra_opts,
+        }
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             if info:
                 final_filename = ydl.prepare_filename(info)
-                if format_type == 'mp4' and not final_filename.endswith('.mp4'): final_filename = os.path.splitext(final_filename)[0] + '.mp4'
+                # Corrigir extensão conforme formato real
+                if format_type == 'mp4' and not final_filename.endswith('.mp4'):
+                    final_filename = os.path.splitext(final_filename)[0] + '.mp4'
+                elif format_type == 'mp3':
+                    final_filename = os.path.splitext(final_filename)[0] + '.mp3'
                 show_notification("YouDown Pro", f"Concluído: {title_hint}")
                 add_to_history_db(video_id, info.get('title', title_hint), info.get('uploader', channel_hint), info.get('thumbnail', thumb_hint), os.path.basename(final_filename), final_filename, format_type)
-                socketio.emit('progress', {'id': video_id, 'percent': 100, 'status': 'finished'})
+                final_payload = {'id': video_id, 'percent': 100, 'status': 'finished'}
+                progress_store[video_id] = final_payload
+                socketio.emit('progress', final_payload)
+    except DownloadCancelled:
+        socketio.emit('progress', {'id': video_id, 'percent': 0, 'status': 'cancelled'})
+        progress_store[video_id] = {'percent': 0, 'status': 'cancelled'}
     except Exception as e:
         print(f"[Download Error] {str(e)}")
-        socketio.emit('progress', {'id': video_id, 'percent': 0, 'status': 'error', 'msg': str(e)})
+        error_payload = {'id': video_id, 'percent': 0, 'status': 'error', 'msg': str(e)}
+        progress_store[video_id] = error_payload
+        socketio.emit('progress', error_payload)
         show_notification("Erro", f"Falha no download: {title_hint}")
+    finally:
+        # Fix: limpar cancelled_tasks para que nova tentativa do mesmo ID funcione
+        cancelled_tasks.discard(video_id)
 
 @app.route('/api/download-single', methods=['POST'])
 def download_single():
@@ -687,10 +730,12 @@ def download_section():
             print(f"[Erro Recorte] {str(e)}")
             socketio.emit('progress', {'id': section_id, 'percent': 0, 'status': 'error'})
         finally:
-            if section_id in cancelled_tasks: cancelled_tasks.remove(section_id)
+            # Fix: usar discard (não remove) para não levantar erro se já não está presente
+            cancelled_tasks.discard(section_id)
             
-    task_queue.put((run_download, ()))
-    print(f"[Sistema] Recorte adicionado à fila: {section_id}")
+    # Fix: task_queue não existe — usar executor como no download normal
+    executor.submit(run_download)
+    print(f"[Sistema] Recorte iniciado em paralelo: {section_id}")
     return jsonify({'success': True, 'taskId': section_id})
 
 @app.route('/api/progress-all', methods=['POST'])
@@ -752,22 +797,30 @@ def play_video():
     file_path = data.get('file_path')
     print(f"[DEBUG] Rota /api/execute-play chamada para: {file_path}")
     
-    # 1. Tenta o caminho exato (mais rápido)
+    def _safe_open(path):
+        """Valida que o caminho está dentro de DOWNLOAD_FOLDER antes de abrir."""
+        resolved = os.path.realpath(os.path.abspath(path))
+        allowed = os.path.realpath(os.path.abspath(DOWNLOAD_FOLDER))
+        if not resolved.startswith(allowed + os.sep) and resolved != allowed:
+            print(f"[Security] Acesso negado a caminho fora de downloads: {resolved}")
+            return False
+        return open_path(resolved)
+
+    # 1. Tenta o caminho exacto
     if file_path and os.path.exists(file_path):
-        if open_path(file_path):
+        if _safe_open(file_path):
             return jsonify({'success': True})
             
-    # 2. Fallback: Se o caminho absoluto falhou (ex: pasta movida ou app reiniciado),
-    # procura pelo nome do ficheiro dentro da pasta de downloads atual.
+    # 2. Fallback por nome de ficheiro dentro de DOWNLOAD_FOLDER
     if file_path:
         filename = os.path.basename(file_path)
-        print(f"[Play] Ficheiro não encontrado no caminho original. A procurar por '{filename}' em {DOWNLOAD_FOLDER}...")
+        print(f"[Play] A procurar '{filename}' em {DOWNLOAD_FOLDER}...")
         
         for root, dirs, files in os.walk(DOWNLOAD_FOLDER):
             if filename in files:
                 new_path = os.path.join(root, filename)
                 print(f"[Play] Ficheiro encontrado em: {new_path}")
-                if open_path(new_path):
+                if _safe_open(new_path):
                     return jsonify({'success': True})
 
     return jsonify({

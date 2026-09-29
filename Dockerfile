@@ -20,12 +20,20 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy requirements and install
-COPY backend/requirements.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy and build frontend
+COPY frontend_react /app/frontend_react
+WORKDIR /app/frontend_react
+RUN npm install && npm run build
+WORKDIR /app
+
 # Copy backend code
-COPY backend /app/backend
-COPY cookies.txt /app/cookies.txt
+COPY app.py /app/app.py
+COPY manage_cookies.py /app/manage_cookies.py
+# Criar um cookies.txt vazio para evitar erros
+RUN touch /app/cookies.txt
 
 # Create downloads folder
 RUN mkdir -p /app/downloads && chmod 777 /app/downloads
@@ -34,4 +42,4 @@ RUN mkdir -p /app/downloads && chmod 777 /app/downloads
 EXPOSE 5000
 
 # Entry point
-CMD ["python", "-m", "backend.app.main"]
+CMD ["python", "app.py"]

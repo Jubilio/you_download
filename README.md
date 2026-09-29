@@ -1,4 +1,5 @@
 # 📥 YouDown Pro - The Ultimate Media Pipeline
+
 by **[NexoVibe](https://nexovibe.netlify.app/)**
 
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
@@ -11,7 +12,9 @@ by **[NexoVibe](https://nexovibe.netlify.app/)**
 ---
 
 ## 🏛️ The Vision
+
 In a world moving towards **Agentic AI**, your proprietary operational context is your only moat. YouDown Pro is designed to be more than a downloader; it is a **Composable Architecture** layer that:
+
 - **Abstracts SaaS Silos**: Uses vendor-neutral engines (yt-dlp) to ensure data sovereignty.
 - **Preserves Context**: Maintains rich metadata, chapters, and history for AI-driven analysis.
 - **Modularizes Logic**: Separates extraction, processing, and UI for seamless evolution.
@@ -44,6 +47,7 @@ In a world moving towards **Agentic AI**, your proprietary operational context i
 ## 🚀 Installation & Setup
 
 ### Quick Start (Windows)
+
 1. Ensure you have [Node.js](https://nodejs.org/) installed (required for YouTube challenge solving).
 2. Run `setup.bat`. This will:
    - Create a virtual environment (`.env`).
@@ -52,6 +56,7 @@ In a world moving towards **Agentic AI**, your proprietary operational context i
 3. Access the dashboard at [http://127.0.0.1:5000](http://127.0.0.1:5000).
 
 ### Manual Setup
+
 ```bash
 # 1. Environment
 python -m venv .env
@@ -70,6 +75,7 @@ python app.py
 ---
 
 ## 📋 Project Structure
+
 ```text
 you_down/
 ├── app.py                 # Industrial Backend (API & WebSocket)
@@ -85,11 +91,12 @@ you_down/
 ---
 
 ## 🎯 Tips for Pro Users
+
 - **IPv4 Enforcement**: YouDown Pro forces IPv4 to bypass IP mismatch blocks common in IPv6 environments.
 - **Node.js Integration**: Always keep Node.js updated to ensure the `n-challenge` solver works correctly.
 - **Privacy First**: All history, cookies, and files are stored locally. Your data never leaves your machine.
 
 ---
 
-**Last Update:** May 2026  
+**Last Update:** May 2026
 **Developed with ❤️ by [NexoVibe](https://nexovibe.netlify.app/)**
