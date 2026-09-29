@@ -47,7 +47,7 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => logEndRef.current?.scrollIntoView({ behavior: 'smooth' }), [logs]);
+  useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [logs]);
 
   const handleAnalyze = async () => {
     if (!url) return;
@@ -239,6 +239,9 @@ export default function App() {
           <NavItem active={activeTab === 'history'} onClick={() => setActiveTab('history')} icon={<HistoryIcon size={24} />} label="Histórico" />
           <NavItem active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<SettingsIcon size={24} />} label="Definições" />
           <NavItem active={activeTab === 'vision'} onClick={() => setActiveTab('vision')} icon={<Zap size={24} className="text-yd-primary" />} label="Manifesto" />
+          <div className="pt-4 mt-4 border-t border-white/10">
+            <NavItem active={activeTab === 'pro'} onClick={() => setActiveTab('pro')} icon={<Sparkles size={24} className="text-yellow-400" />} label="YouDown Pro" />
+          </div>
         </div>
       </nav>
 
@@ -480,6 +483,8 @@ export default function App() {
               </div>
             </motion.div>
           )}
+
+          {activeTab === 'pro' && <ProView />}
 
           <AnimatePresence>
             {showDetails && (
@@ -768,6 +773,80 @@ function TaskCard({ task, setTasks }) {
             <X size={16} />
           </button>
         )}
+      </div>
+    </motion.div>
+  );
+}
+
+function ProView() {
+  return (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-6xl mx-auto py-12 px-6 lg:px-12">
+      <div className="text-center mb-16 relative">
+        <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-48 h-48 bg-yellow-500/10 blur-[100px] rounded-full"></div>
+        <div className="inline-flex items-center justify-center p-3 bg-yellow-500/10 rounded-2xl text-yellow-400 mb-6">
+          <Sparkles size={32} />
+        </div>
+        <h1 className="text-4xl md:text-6xl font-black mb-6 tracking-tight bg-gradient-to-r from-white via-yellow-100 to-yellow-500 bg-clip-text text-transparent">
+          YouDown Pro Edition
+        </h1>
+        <p className="text-white/60 text-xl max-w-2xl mx-auto leading-relaxed">
+          O próximo nível na gestão local de conhecimento. Ferramentas exclusivas para educadores, formadores e organizações que valorizam a privacidade e propriedade dos dados.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+        <div className="glass p-8 rounded-3xl border border-white/5 hover:border-yellow-500/30 transition-all duration-300 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/5 rounded-bl-[100px] -z-10 group-hover:bg-yellow-500/10 transition-colors"></div>
+          <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center text-yellow-400 mb-6 border border-white/10">
+            <TerminalIcon size={24} />
+          </div>
+          <h3 className="text-xl font-bold mb-3">Transcrição Local (Whisper)</h3>
+          <p className="text-white/50 text-sm leading-relaxed mb-6">
+            Gere legendas (.srt/.vtt) offline e sem custos adicionais, utilizando modelos de IA otimizados a correr diretamente na sua máquina, garantindo 100% de privacidade.
+          </p>
+          <div className="text-xs font-bold uppercase tracking-wider text-yellow-500/70 bg-yellow-500/10 inline-block px-3 py-1 rounded-md">Em Breve</div>
+        </div>
+
+        <div className="glass p-8 rounded-3xl border border-white/5 hover:border-yellow-500/30 transition-all duration-300 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/5 rounded-bl-[100px] -z-10 group-hover:bg-yellow-500/10 transition-colors"></div>
+          <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center text-yellow-400 mb-6 border border-white/10">
+            <FolderOpen size={24} />
+          </div>
+          <h3 className="text-xl font-bold mb-3">Exportação de Pacotes (Bundles)</h3>
+          <p className="text-white/50 text-sm leading-relaxed mb-6">
+            Empacote múltiplos recortes de vídeo, legendas, e anotações num ficheiro ZIP pronto a ser distribuído a alunos ou integrado no seu LMS (Moodle, Canvas).
+          </p>
+          <div className="text-xs font-bold uppercase tracking-wider text-yellow-500/70 bg-yellow-500/10 inline-block px-3 py-1 rounded-md">Em Breve</div>
+        </div>
+
+        <div className="glass p-8 rounded-3xl border border-white/5 hover:border-yellow-500/30 transition-all duration-300 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/5 rounded-bl-[100px] -z-10 group-hover:bg-yellow-500/10 transition-colors"></div>
+          <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center text-yellow-400 mb-6 border border-white/10">
+            <ListVideo size={24} />
+          </div>
+          <h3 className="text-xl font-bold mb-3">Processamento em Lote (Batch)</h3>
+          <p className="text-white/50 text-sm leading-relaxed mb-6">
+            Colezenas de links de uma vez ou importe um ficheiro TXT com timecodes precisos. O YouDown Pro automatiza a extração de massa sem intervenção manual.
+          </p>
+          <div className="text-xs font-bold uppercase tracking-wider text-yellow-500/70 bg-yellow-500/10 inline-block px-3 py-1 rounded-md">Em Breve</div>
+        </div>
+      </div>
+
+      <div className="glass p-12 rounded-[40px] border border-yellow-500/20 bg-gradient-to-r from-black via-[#1a1500] to-black text-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
+        <div className="relative z-10">
+          <h2 className="text-3xl font-black mb-4">Interessado na Edição Pro?</h2>
+          <p className="text-white/60 mb-8 max-w-xl mx-auto">
+            Estamos a trabalhar com parceiros selecionados (formadores, escolas e pequenas organizações) para o piloto do YouDown Pro. Implementação técnica e suporte direto incluídos.
+          </p>
+          <a 
+            href="mailto:contact@youdownpro.com?subject=Interesse%20YouDown%20Pro"
+            className="inline-flex items-center gap-3 bg-yellow-500 text-black px-8 py-4 rounded-xl font-black text-lg hover:bg-yellow-400 transition-colors shadow-lg shadow-yellow-500/20"
+          >
+            <Sparkles size={20} />
+            Agendar Demonstração / Piloto
+          </a>
+        </div>
       </div>
     </motion.div>
   );

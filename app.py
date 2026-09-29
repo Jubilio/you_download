@@ -82,7 +82,8 @@ def get_static_path():
     return get_resource_path('frontend_react/dist')
 
 app = Flask(__name__, static_folder=get_static_path(), static_url_path='')
-CORS(app)
+# Restringir CORS apenas a origens locais (segurança reforçada)
+CORS(app, resources={r"/api/*": {"origins": ["http://127.0.0.1:5000", "http://localhost:5000"]}})
 
 @app.route('/')
 def index():
@@ -93,7 +94,8 @@ def page_not_found(e):
     return app.send_static_file('index.html')
 
 # Usando async_mode='threading' para eliminar dependência do Eventlet (deprecated)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+# Restringir origens do SocketIO às origens locais
+socketio = SocketIO(app, cors_allowed_origins=["http://127.0.0.1:5000", "http://localhost:5000"], async_mode='threading')
 
 # Executor para downloads simultâneos (3 ao mesmo tempo)
 executor = ThreadPoolExecutor(max_workers=3)
@@ -111,7 +113,7 @@ def show_notification(title, message):
             print(f"[Notificação] {title}: {message}")
     except: pass
 
-DOWNLOAD_FOLDER = os.path.join(os.path.expanduser("~"), "Downloads")
+DOWNLOAD_FOLDER = os.environ.get("DOWNLOAD_PATH", os.path.join(os.path.expanduser("~"), "Downloads"))
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 COOKIES_FILE = os.path.join(os.getcwd(), 'cookies.txt')
@@ -272,7 +274,7 @@ def get_common_opts():
         },
         
         'concurrent_fragment_downloads': 5, # Aumentado para maior velocidade
-        'nocheckcertificate': True,
+        'nocheckcertificate': False, # Ativada a verificação de certificados
         'geo_bypass': True,
         'hls_prefer_native': True,
         
@@ -678,13 +680,16 @@ def download_section():
     
     def run_download():
         try:
-            socketio.emit('progress', {
+            initial_payload = {
                 'id': section_id, 
                 'percent': 0, 
                 'status': 'starting',
                 'title': f"Recorte: {title}",
                 'thumbnail': data.get('thumbnail', '')
-            })
+            }
+            progress_store[section_id] = initial_payload
+            socketio.emit('progress', initial_payload)
+            
             out_tmpl = os.path.join(DOWNLOAD_FOLDER, f"%(title)s - {title}.%(ext)s")
             
             # Engine Robusta Definitiva: bv*[ext=mp4]+ba[ext=m4a]/b
@@ -723,12 +728,18 @@ def download_section():
                     'mp4'
                 )
             
-            socketio.emit('progress', {'id': section_id, 'percent': 100, 'status': 'finished'})
+                final_payload = {'id': section_id, 'percent': 100, 'status': 'finished'}
+                progress_store[section_id] = final_payload
+                socketio.emit('progress', final_payload)
         except DownloadCancelled:
-            socketio.emit('progress', {'id': section_id, 'percent': 0, 'status': 'cancelled'})
+            payload = {'id': section_id, 'percent': 0, 'status': 'cancelled'}
+            progress_store[section_id] = payload
+            socketio.emit('progress', payload)
         except Exception as e: 
             print(f"[Erro Recorte] {str(e)}")
-            socketio.emit('progress', {'id': section_id, 'percent': 0, 'status': 'error'})
+            payload = {'id': section_id, 'percent': 0, 'status': 'error'}
+            progress_store[section_id] = payload
+            socketio.emit('progress', payload)
         finally:
             # Fix: usar discard (não remove) para não levantar erro se já não está presente
             cancelled_tasks.discard(section_id)
@@ -798,12 +809,21 @@ def play_video():
     print(f"[DEBUG] Rota /api/execute-play chamada para: {file_path}")
     
     def _safe_open(path):
-        """Valida que o caminho está dentro de DOWNLOAD_FOLDER antes de abrir."""
+        """Valida que o caminho está dentro de DOWNLOAD_FOLDER e tem uma extensão autorizada."""
         resolved = os.path.realpath(os.path.abspath(path))
         allowed = os.path.realpath(os.path.abspath(DOWNLOAD_FOLDER))
+        
+        # 1. Verificar path traversal
         if not resolved.startswith(allowed + os.sep) and resolved != allowed:
             print(f"[Security] Acesso negado a caminho fora de downloads: {resolved}")
             return False
+            
+        # 2. Verificar extensões permitidas
+        allowed_extensions = ('.mp4', '.mp3', '.m4a', '.webm', '.mkv')
+        if not resolved.lower().endswith(allowed_extensions):
+            print(f"[Security] Acesso negado a tipo de ficheiro não autorizado: {resolved}")
+            return False
+            
         return open_path(resolved)
 
     # 1. Tenta o caminho exacto
@@ -897,7 +917,7 @@ def stream_file(filename):
 
 if __name__ == '__main__':
     is_frozen = getattr(sys, 'frozen', False)
-    host_addr = '127.0.0.1'
+    host_addr = os.environ.get('FLASK_HOST', '127.0.0.1')
     
     # Se estivermos no modo Desktop (com pywebview)
     try:
